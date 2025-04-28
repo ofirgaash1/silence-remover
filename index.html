@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Audio Silence Cutter</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Audio Silence Cutter</h1>
+
+    <input type="file" id="audioFile" accept=".mp3">
+    <br><br>
+
+    <div id="waveform"></div>
+
+    <div id="controls">
+        <label>
+            Amplitude Threshold: 
+            <input type="range" id="thresholdSlider" min="0" max="100" value="20">
+            <span id="thresholdValue">20%</span>
+        </label>
+        <br><br>
+
+        <label>
+            Shrink Silence by (ms): 
+            <input type="range" id="shrinkSlider" min="0" max="1000" value="100">
+            <span id="shrinkValue">100ms</span>
+        </label>
+        <br><br>
+
+        <button id="exportRanges">Export Silent Ranges</button>
+        <button id="cutAudio">Cut Audio (Preview)</button>
+    </div>
+
+    <div id="player">
+        <h2>Preview:</h2>
+        <audio id="audioPreview" controls></audio>
+    </div>
+
+    
+    <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
+    <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
+
+
+    <script src="script.js"></script>
+</body>
+</html>
+
