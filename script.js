@@ -99,19 +99,21 @@ downloadBtn.addEventListener('click', () => {
 function handleFile(file) {
     if (!file) return;
   
+    // Clear previous state
     if (wavesurfer) wavesurfer.destroy();
     audioBuffer = null;
     silentRegions = [];
     lastBlob = null;
     audioPreview.src = '';
   
-  // —— Hide drop-zone IMMEDIATELY
-  dropZone.style.display = 'none';
-  waveformDiv.style.display = 'block';
+    // Immediately hide dropzone, show waveform container
+    dropZone.style.display = 'none';
+    waveformDiv.style.display = 'block';
   
+    // Create new WaveSurfer instance
     wavesurfer = WaveSurfer.create({
       container: waveformDiv,
-      waveColor: 'blue',
+      waveColor: 'blue',          // unified color (optional visual improvement)
       progressColor: 'blue',
       backend: 'WebAudio',
       plugins: [ WaveSurfer.regions.create({}) ]
@@ -123,17 +125,26 @@ function handleFile(file) {
       const ctx = new AudioContext();
       audioBuffer = await ctx.decodeAudioData(arrayBuffer);
   
-      // Instead of loadBlob, do this:
+      // Load the already decoded buffer
       wavesurfer.loadDecodedBuffer(audioBuffer);
   
       wavesurfer.on('ready', () => {
-        markSilentRegions();
-        drawRegions(); // <== ADD this!
-        cutAudio();
-    });
+        dropZone.style.display = 'none';
+        waveformDiv.style.display = 'block';
+        
+        markSilentRegions();  // <--- NOT handleThresholdChange
+        drawRegions();
+        
+        setTimeout(() => {
+          cutAudio();
+        }, 50);
+      });
+      
+      
     };
     reader.readAsArrayBuffer(file);
   }
+  
   
 
 function handleThresholdChange() {
@@ -184,7 +195,7 @@ function markSilentRegions() {
       silentRegions.push(currentRegion);
     }
   }
-
+  console.log('Silent regions marked:', silentRegions.length, silentRegions);
   applyShrinkFilter(shrinkMs);
   mergeOverlappingRegions();
   drawRegions();
@@ -219,6 +230,7 @@ function mergeOverlappingRegions() {
 }
 
 function drawRegions() {
+    console.log('Drawing regions:', silentRegions.length);
   if (!wavesurfer) return;
   Object.values(wavesurfer.regions.list).forEach(region => region.remove());
 
@@ -226,7 +238,9 @@ function drawRegions() {
     wavesurfer.addRegion({
       start: region.start,
       end: region.end,
-      color: 'rgba(255,0,0,0.3)'
+      color: 'rgba(255,0,0,0.3)',
+      drag: false,
+      resize: false
     });
   });
 }
@@ -242,6 +256,7 @@ function exportSilentRanges() {
 }
 
 function cutAudio() {
+    console.log('Cutting audio based on regions:', silentRegions.length);
   if (!audioBuffer) return;
 
   const sampleRate = audioBuffer.sampleRate;
