@@ -99,21 +99,18 @@ downloadBtn.addEventListener('click', () => {
 function handleFile(file) {
     if (!file) return;
   
-    // Clear previous state
     if (wavesurfer) wavesurfer.destroy();
     audioBuffer = null;
     silentRegions = [];
     lastBlob = null;
     audioPreview.src = '';
   
-    // Immediately hide dropzone, show waveform container
     dropZone.style.display = 'none';
     waveformDiv.style.display = 'block';
   
-    // Create new WaveSurfer instance
     wavesurfer = WaveSurfer.create({
       container: waveformDiv,
-      waveColor: 'blue',          // unified color (optional visual improvement)
+      waveColor: 'blue',
       progressColor: 'blue',
       backend: 'WebAudio',
       plugins: [ WaveSurfer.regions.create({}) ]
@@ -124,29 +121,25 @@ function handleFile(file) {
       const arrayBuffer = e.target.result;
       const ctx = new AudioContext();
       audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    
+      
+      // 🛠 RIGHT HERE — detect silence IMMEDIATELY
+      markSilentRegions();
+      drawRegions();
+      cutAudio();
   
-      // Load the already decoded buffer
+      // Then load into WaveSurfer
       wavesurfer.loadDecodedBuffer(audioBuffer);
   
+      // Optional: still listen for visual ready
       wavesurfer.on('ready', () => {
         dropZone.style.display = 'none';
         waveformDiv.style.display = 'block';
-        
-        markSilentRegions();  // <--- NOT handleThresholdChange
-        drawRegions();
-        
-        setTimeout(() => {
-          cutAudio();
-        }, 50);
       });
-      
-      
     };
     reader.readAsArrayBuffer(file);
   }
   
-  
-
 function handleThresholdChange() {
   if (!audioBuffer) return;
   markSilentRegions();
@@ -158,7 +151,10 @@ function handleShrinkChange() {
 }
 
 function markSilentRegions() {
-  const threshold = Math.pow(+thresholdSlider.value / 100, 2);
+    const raw = +thresholdSlider.value / 100;
+    const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1); 
+    const threshold = mapped * mapped;
+    
   const shrinkMs = +shrinkSlider.value;
 
   const data = audioBuffer.getChannelData(0);
@@ -195,7 +191,7 @@ function markSilentRegions() {
       silentRegions.push(currentRegion);
     }
   }
-  console.log('Silent regions marked:', silentRegions.length, silentRegions);
+  
   applyShrinkFilter(shrinkMs);
   mergeOverlappingRegions();
   drawRegions();
@@ -230,7 +226,6 @@ function mergeOverlappingRegions() {
 }
 
 function drawRegions() {
-    console.log('Drawing regions:', silentRegions.length);
   if (!wavesurfer) return;
   Object.values(wavesurfer.regions.list).forEach(region => region.remove());
 
@@ -250,13 +245,11 @@ function exportSilentRanges() {
     alert('No silent regions detected.');
     return;
   }
-  console.log('Silent Ranges:', silentRegions);
   navigator.clipboard.writeText(JSON.stringify(silentRegions, null, 2))
     .then(() => alert('Silent ranges copied to clipboard and console.'));
 }
 
 function cutAudio() {
-    console.log('Cutting audio based on regions:', silentRegions.length);
   if (!audioBuffer) return;
 
   const sampleRate = audioBuffer.sampleRate;
