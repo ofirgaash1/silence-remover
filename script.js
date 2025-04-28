@@ -121,19 +121,21 @@ function markSilentRegions() {
 }
 
 
+
 function applyShrink() {
     const shrink = shrinkMs / 1000; // convert ms to seconds
+
     silentRegions = silentRegions.map(region => {
-        const mid = (region.start + region.end) / 2;
         let start = region.start + shrink;
         let end = region.end - shrink;
         if (start >= end) {
-            // if shrinking fully overlaps, fallback to very small region at center
-            start = end = mid;
+            // If shrinking fully collapses the region, skip it
+            return null;
         }
-        return { start: start, end: end };
-    });
+        return { start, end };
+    }).filter(region => region && (region.end - region.start) > 0.01); // Keep only meaningful regions
 }
+
 
 function mergeOverlappingRegions() {
     if (silentRegions.length <= 1) return;
