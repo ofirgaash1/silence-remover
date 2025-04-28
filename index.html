@@ -6,49 +6,80 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Audio Silence Cutter</h1>
 
-  <div id="drop-zone">
-    Drag &amp; drop an audio file here
-    <br>
-    or <button id="browseBtn">Choose File</button>
-    <input type="file" id="audioFile" accept=".mp3, .wav, .ogg" style="display: none;">
+<h1>Audio Silence Cutter</h1>
+
+<!-- Drag & Drop or Browse Area -->
+<div id="drop-zone" class="drop-zone">
+  <p>Drag & drop an audio file here<br>or <button id="browseBtn">Choose File</button></p>
+  <input type="file" id="audioFile" accept="audio/*" style="display:none;">
+</div>
+
+<!-- Waveform Container -->
+<div id="waveform" class="waveform" style="display:none;"></div>
+
+
+<!-- Sliders and Controls -->
+<div class="controls">
+
+  <div class="control-group">
+    <label for="thresholdSlider">Amplitude Threshold:</label>
+    <div class="slider-row">
+      <input type="range" id="thresholdSlider" min="0" max="100" step="0.01">
+      <input type="number" id="thresholdInput" step="0.01">% 
+    </div>
   </div>
 
-  <div id="waveform"></div>
-
-  <div id="controls">
-    <label>
-        Amplitude Threshold:
-        <input type="range" id="thresholdSlider" min="0" max="100" step="0.01" value="20">
-        <input type="number" id="thresholdInput" min="0" max="100" step="0.01" value="20">%
-      </label>
-      
-      <label>
-        Shrink Silence:
-        <input type="range" id="shrinkSlider" min="0" max="1000" step="1" value="100">
-        <input type="number" id="shrinkInput" min="0" max="1000" step="1" value="100">ms
-      </label>      
-      <label>
-        Output Format:
-        <button type="button" class="fmt-btn selected" data-format="mp3">MP3 ✓</button>
-        <button type="button" class="fmt-btn"         data-format="wav">WAV</button>
-      </label>           
-    <button id="exportRanges">Export Silent Ranges</button>
-    <button id="cutAudio">Cut Audio</button>
+  <div class="control-group">
+    <label for="shrinkSlider">Shrink Silence:</label>
+    <div class="slider-row">
+      <input type="range" id="shrinkSlider" min="0" max="1000" step="1">
+      <input type="number" id="shrinkInput" step="1">ms
+    </div>
   </div>
 
-  <div id="player">
-    <h2>Preview:</h2>
-    <audio id="audioPreview" controls></audio>
-    <button id="downloadBtn">Download</button>
+  <div class="format-controls">
+    <label>Output Format:</label>
+    <button class="fmt-btn selected" data-format="mp3">MP3 ✓</button>
+    <button class="fmt-btn" data-format="wav">WAV</button>
   </div>
 
-  <!-- WaveSurfer v6 + Regions plugin -->
-  <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
-  <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
-  <!-- LameJS for MP3 encoding -->
-  <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
-  <script src="script.js"></script>
+  <div class="button-row">
+    <button id="cutAudio">Create Preview</button>
+  </div>
+
+</div>
+
+<!-- Statistics Panel -->
+<h3>Statistics:</h3>
+<div id="statsPanel">Time saved: 0s - 0% shorter - 0 silence regions</div>
+
+<!-- Audio Preview -->
+<h3>Preview:</h3>
+<audio id="audioPreview" controls></audio>
+
+<button id="downloadBtn" class="download-btn">Download</button>
+
+<!-- Scripts Output -->
+<h3>Cutting Scripts (Copy-Paste Ready)</h3>
+
+<div class="scripts-container">
+  <div>
+    <h4>Bash Script</h4>
+    <textarea id="bashScript" readonly rows="10"></textarea>
+    <button onclick="copyScript('bashScript')">Copy Bash Script</button>
+  </div>
+  <div>
+    <h4>PowerShell Script</h4>
+    <textarea id="psScript" readonly rows="10"></textarea>
+    <button onclick="copyScript('psScript')">Copy PowerShell Script</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
+<script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
+<script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
+<script src="script.js"></script>
+
 </body>
 </html>

@@ -4,6 +4,8 @@ let audioBuffer = null;
 let silentRegions = [];
 let lastBlob = null;
 let outputFormat = 'mp3'; // default
+let isDragging = false;
+
 
 // —— Element references ——
 const dropZone = document.getElementById('drop-zone');
@@ -19,6 +21,9 @@ const exportButton = document.getElementById('exportRanges');
 const cutButton = document.getElementById('cutAudio');
 const audioPreview = document.getElementById('audioPreview');
 const downloadBtn = document.getElementById('downloadBtn');
+const bashScriptBox = document.getElementById('bashScript');
+const psScriptBox = document.getElementById('psScript');
+const statsPanel = document.getElementById('statsPanel');
 
 // —— Setup UI Events ——
 
@@ -38,47 +43,56 @@ dropZone.addEventListener('drop', e => {
 
 // Threshold sliders + input syncing
 thresholdSlider.addEventListener('input', e => {
+  isDragging = true;
   thresholdInput.value = e.target.value;
   handleThresholdChange();
 });
 thresholdInput.addEventListener('input', e => {
+  isDragging = true;
   thresholdSlider.value = e.target.value;
+  handleThresholdChange();
+});
+thresholdSlider.addEventListener('mouseup', () => {
+  isDragging = false;
+  handleThresholdChange(); // full precise recalculation after release
+});
+thresholdInput.addEventListener('mouseup', () => {
+  isDragging = false;
   handleThresholdChange();
 });
 
 // Shrink sliders + input syncing
 shrinkSlider.addEventListener('input', e => {
+  isDragging = true;
   shrinkInput.value = e.target.value;
   handleShrinkChange();
 });
 shrinkInput.addEventListener('input', e => {
+  isDragging = true;
   shrinkSlider.value = e.target.value;
   handleShrinkChange();
 });
-
-// Auto-cut when slider value changes (mouseup / blur)
-thresholdSlider.addEventListener('change', cutAudio);
-thresholdInput.addEventListener('change', cutAudio);
-shrinkSlider.addEventListener('change', cutAudio);
-shrinkInput.addEventListener('change', cutAudio);
+shrinkSlider.addEventListener('mouseup', () => {
+  isDragging = false;
+  handleShrinkChange();
+});
+shrinkInput.addEventListener('mouseup', () => {
+  isDragging = false;
+  handleShrinkChange();
+});
 
 // Format toggle buttons
 formatButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      formatButtons.forEach(b => {
-        b.classList.remove('selected');
-        b.innerText = b.dataset.format.toUpperCase();
-      });
-      btn.classList.add('selected');
-      btn.innerText = `${btn.dataset.format.toUpperCase()} ✓`;
-      outputFormat = btn.dataset.format;
-      cutAudio();
+  btn.addEventListener('click', () => {
+    formatButtons.forEach(b => {
+      b.classList.remove('selected');
+      b.innerText = b.dataset.format.toUpperCase();
     });
+    btn.classList.add('selected');
+    btn.innerText = `${btn.dataset.format.toUpperCase()} ✓`;
+    outputFormat = btn.dataset.format;
   });
-  
-
-// Export button
-exportButton.addEventListener('click', exportSilentRanges);
+});
 
 // Cut button
 cutButton.addEventListener('click', cutAudio);
@@ -97,49 +111,48 @@ downloadBtn.addEventListener('click', () => {
 // —— Core functions ——
 
 function handleFile(file) {
-    if (!file) return;
-  
-    if (wavesurfer) wavesurfer.destroy();
-    audioBuffer = null;
-    silentRegions = [];
-    lastBlob = null;
-    audioPreview.src = '';
-  
-    dropZone.style.display = 'none';
-    waveformDiv.style.display = 'block';
-  
-    wavesurfer = WaveSurfer.create({
-      container: waveformDiv,
-      waveColor: 'blue',
-      progressColor: 'blue',
-      backend: 'WebAudio',
-      plugins: [ WaveSurfer.regions.create({}) ]
-    });
-  
-    const reader = new FileReader();
-    reader.onload = async e => {
-      const arrayBuffer = e.target.result;
-      const ctx = new AudioContext();
-      audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-    
-      
-      // 🛠 RIGHT HERE — detect silence IMMEDIATELY
-      markSilentRegions();
-      drawRegions();
-      cutAudio();
-  
-      // Then load into WaveSurfer
-      wavesurfer.loadDecodedBuffer(audioBuffer);
-  
-      // Optional: still listen for visual ready
-      wavesurfer.on('ready', () => {
-        dropZone.style.display = 'none';
-        waveformDiv.style.display = 'block';
-      });
-    };
-    reader.readAsArrayBuffer(file);
-  }
-  
+  if (!file) return;
+
+  if (wavesurfer) wavesurfer.destroy();
+  audioBuffer = null;
+  silentRegions = [];
+  lastBlob = null;
+  audioPreview.src = '';
+
+  dropZone.style.display = 'none';
+  waveformDiv.style.display = 'block';
+
+  wavesurfer = WaveSurfer.create({
+    container: waveformDiv,
+    waveColor: 'blue',
+    progressColor: 'blue',
+    backend: 'WebAudio',
+    plugins: [ WaveSurfer.regions.create({}) ]
+  });
+
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const arrayBuffer = e.target.result;
+    const ctx = new AudioContext();
+    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+    // Set dynamic minimum threshold
+    const minThreshold = findMinimumUsefulThreshold(audioBuffer);
+    const minPercent = (minThreshold * 100).toFixed(2);
+
+    thresholdSlider.min = minPercent;
+    thresholdInput.min = minPercent;
+    thresholdSlider.value = minPercent;
+    thresholdInput.value = minPercent;
+
+    handleThresholdChange(); // calculate first regions
+    drawRegions();
+
+    wavesurfer.loadDecodedBuffer(audioBuffer);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
 function handleThresholdChange() {
   if (!audioBuffer) return;
   markSilentRegions();
@@ -151,15 +164,16 @@ function handleShrinkChange() {
 }
 
 function markSilentRegions() {
-    const raw = +thresholdSlider.value / 100;
-    const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1); 
-    const threshold = mapped * mapped;
-    
+  const raw = +thresholdSlider.value / 100;
+  const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1); 
+  const threshold = mapped * mapped;
   const shrinkMs = +shrinkSlider.value;
 
   const data = audioBuffer.getChannelData(0);
   const sampleRate = audioBuffer.sampleRate;
-  const samplesPerPixel = Math.floor(sampleRate / 100);
+  const precision = isDragging ? 3 : 100; // Use low precision when dragging
+  const samplesPerPixel = Math.floor(sampleRate / precision);
+
   let silent = false;
   let currentRegion = null;
   silentRegions = [];
@@ -191,10 +205,10 @@ function markSilentRegions() {
       silentRegions.push(currentRegion);
     }
   }
-  
   applyShrinkFilter(shrinkMs);
   mergeOverlappingRegions();
   drawRegions();
+  updateStats(); // update statistics every time regions change
 }
 
 function applyShrinkFilter(shrinkMs) {
@@ -240,13 +254,16 @@ function drawRegions() {
   });
 }
 
-function exportSilentRanges() {
-  if (!silentRegions.length) {
-    alert('No silent regions detected.');
-    return;
-  }
-  navigator.clipboard.writeText(JSON.stringify(silentRegions, null, 2))
-    .then(() => alert('Silent ranges copied to clipboard and console.'));
+function updateStats() {
+  const originalDuration = audioBuffer ? (audioBuffer.duration || 0) : 0;
+  let totalSilence = 0;
+  silentRegions.forEach(region => {
+    totalSilence += (region.end - region.start);
+  });
+  const timeSaved = totalSilence.toFixed(2);
+  const percentSaved = (originalDuration ? (timeSaved / originalDuration * 100) : 0).toFixed(1);
+
+  statsPanel.innerText = `Time saved: ${timeSaved}s - ${percentSaved}% shorter - ${silentRegions.length} silence regions`;
 }
 
 function cutAudio() {
@@ -292,6 +309,8 @@ function cutAudio() {
       audioPreview.src = URL.createObjectURL(blob);
     });
   }
+
+  generateScripts(); // Update Bash + PowerShell scripts
 }
 
 function encodeWAV(buffer) {
@@ -370,4 +389,39 @@ function encodeMP3(buffer) {
   }
 
   return new Blob(data, { type: 'audio/mp3' });
+}
+
+function generateScripts() {
+  let bash = '#!/bin/bash\n\n';
+  let ps = '### PowerShell Script\n\n';
+
+  silentRegions.forEach((region, idx) => {
+    bash += `# Cut ${idx+1}\nffmpeg -i input.mp4 -ss ${region.start.toFixed(2)} -to ${region.end.toFixed(2)} -c copy part${idx+1}.mp4\n\n`;
+    ps += `# Cut ${idx+1}\nffmpeg -i input.mp4 -ss ${region.start.toFixed(2)} -to ${region.end.toFixed(2)} -c copy part${idx+1}.mp4\n\n`;
+  });
+
+  bashScriptBox.value = bash;
+  psScriptBox.value = ps;
+}
+
+function copyScript(id) {
+  const textarea = document.getElementById(id);
+  textarea.select();
+  document.execCommand('copy');
+}
+
+function findMinimumUsefulThreshold(buffer) {
+  const data = buffer.getChannelData(0);
+  const sampleRate = buffer.sampleRate;
+  const samplesPerChunk = Math.floor(sampleRate / 100);
+  let minNonZeroMax = 1;
+
+  for (let i = 0; i < data.length; i += samplesPerChunk) {
+    const slice = data.slice(i, i + samplesPerChunk);
+    const max = Math.max(...slice.map(Math.abs));
+    if (max > 0.0001 && max < minNonZeroMax) {
+      minNonZeroMax = max;
+    }
+  }
+  return minNonZeroMax;
 }
