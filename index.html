@@ -2,22 +2,23 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Audio Silence Cutter</title>
+  <title>Audio & Video Silence Cutter</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<h1>Audio Silence Cutter</h1>
+<h1>Audio & Video Silence Cutter</h1>
 
 <!-- Drag & Drop or Browse Area -->
 <div id="drop-zone" class="drop-zone">
-  <p>Drag & drop an audio file here<br>or <button id="browseBtn">Choose File</button></p>
-  <input type="file" id="audioFile" accept="audio/*" style="display:none;">
+  <p>Drag & drop an audio or video file here<br>or <button id="browseBtn">Choose File</button></p>
+  <input type="file" id="audioFile" accept="audio/*,video/mp4" style="display:none;">
 </div>
 
 <!-- Waveform Container -->
-<div id="waveform" class="waveform" style="display:none;"></div>
-
+<div id="waveformContainer" style="position: relative;">
+  <div id="waveform" class="waveform" style="display:none;"></div>
+</div>
 
 <!-- Sliders and Controls -->
 <div class="controls">
@@ -39,13 +40,14 @@
   </div>
 
   <div class="format-controls">
-    <label>Output Format:</label>
+    <label>Audio Output Format:</label>
     <button class="fmt-btn selected" data-format="mp3">MP3 ✓</button>
     <button class="fmt-btn" data-format="wav">WAV</button>
   </div>
 
   <div class="button-row">
-    <button id="cutAudio">Create Preview</button>
+    <button id="cutAudio">Create Audio Preview</button>
+    <button id="cutVideoBtn">Create Video Preview</button>
   </div>
 
 </div>
@@ -55,31 +57,28 @@
 <div id="statsPanel">Time saved: 0s - 0% shorter - 0 silence regions</div>
 
 <!-- Audio Preview -->
-<h3>Preview:</h3>
+<h3>Audio Preview:</h3>
 <audio id="audioPreview" controls></audio>
+<br>
+<button id="downloadBtn" class="download-btn">Download Audio</button>
 
-<button id="downloadBtn" class="download-btn">Download</button>
+<!-- Video Preview -->
+<h3>Video Preview:</h3>
+<video id="videoPreview" controls style="display:none; width:100%;"></video>
+<br>
+<button id="downloadVideoBtn" style="display:none;">Download Video</button>
 
-<!-- Scripts Output -->
-<h3>Cutting Scripts (Copy-Paste Ready)</h3>
+<!-- Processing Indicator -->
+<div id="processingIndicator" style="display:none;">Processing, please wait...</div>
 
-<div class="scripts-container">
-  <div>
-    <h4>Bash Script</h4>
-    <textarea id="bashScript" readonly rows="10"></textarea>
-    <button onclick="copyScript('bashScript')">Copy Bash Script</button>
-  </div>
-  <div>
-    <h4>PowerShell Script</h4>
-    <textarea id="psScript" readonly rows="10"></textarea>
-    <button onclick="copyScript('psScript')">Copy PowerShell Script</button>
-  </div>
-</div>
-
+<!-- Script dependencies -->
 <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
 <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
 <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
-<script src="script.js"></script>
+<script src="./ffmpeg.js"></script>
+
+<script src="./script.js"></script>
+
 
 </body>
 </html>

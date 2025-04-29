@@ -4,8 +4,11 @@ let audioBuffer = null;
 let silentRegions = [];
 let lastBlob = null;
 let outputFormat = 'mp3'; // default
-let isDragging = false;
+let precomputedPeaks = [];
+let uploadedFile = null;
 
+const ffmpeg = new FFmpegWASM.FFmpeg({ log: true });
+let ffmpegLoaded = false; // track loading state
 
 // —— Element references ——
 const dropZone = document.getElementById('drop-zone');
@@ -21,12 +24,13 @@ const exportButton = document.getElementById('exportRanges');
 const cutButton = document.getElementById('cutAudio');
 const audioPreview = document.getElementById('audioPreview');
 const downloadBtn = document.getElementById('downloadBtn');
-const bashScriptBox = document.getElementById('bashScript');
-const psScriptBox = document.getElementById('psScript');
 const statsPanel = document.getElementById('statsPanel');
+const videoPreview = document.getElementById('videoPreview');
+const cutVideoBtn = document.getElementById('cutVideoBtn');
+const downloadVideoBtn = document.getElementById('downloadVideoBtn');
+const processingIndicator = document.getElementById('processingIndicator');
 
 // —— Setup UI Events ——
-
 browseBtn.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
 
@@ -41,47 +45,27 @@ dropZone.addEventListener('drop', e => {
   if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
 });
 
-// Threshold sliders + input syncing
+// Threshold sliders
 thresholdSlider.addEventListener('input', e => {
-  isDragging = true;
   thresholdInput.value = e.target.value;
   handleThresholdChange();
 });
 thresholdInput.addEventListener('input', e => {
-  isDragging = true;
   thresholdSlider.value = e.target.value;
   handleThresholdChange();
 });
-thresholdSlider.addEventListener('mouseup', () => {
-  isDragging = false;
-  handleThresholdChange(); // full precise recalculation after release
-});
-thresholdInput.addEventListener('mouseup', () => {
-  isDragging = false;
-  handleThresholdChange();
-});
 
-// Shrink sliders + input syncing
+// Shrink sliders
 shrinkSlider.addEventListener('input', e => {
-  isDragging = true;
   shrinkInput.value = e.target.value;
   handleShrinkChange();
 });
 shrinkInput.addEventListener('input', e => {
-  isDragging = true;
   shrinkSlider.value = e.target.value;
   handleShrinkChange();
 });
-shrinkSlider.addEventListener('mouseup', () => {
-  isDragging = false;
-  handleShrinkChange();
-});
-shrinkInput.addEventListener('mouseup', () => {
-  isDragging = false;
-  handleShrinkChange();
-});
 
-// Format toggle buttons
+// Format buttons
 formatButtons.forEach(btn => {
   btn.addEventListener('click', () => {
     formatButtons.forEach(b => {
@@ -94,10 +78,10 @@ formatButtons.forEach(btn => {
   });
 });
 
-// Cut button
+// Audio cut button
 cutButton.addEventListener('click', cutAudio);
 
-// Download button
+// Download audio
 downloadBtn.addEventListener('click', () => {
   if (!lastBlob) return;
   const url = URL.createObjectURL(lastBlob);
@@ -108,16 +92,36 @@ downloadBtn.addEventListener('click', () => {
   URL.revokeObjectURL(url);
 });
 
+// Video cut button
+cutVideoBtn.addEventListener('click', cutVideo);
+
 // —— Core functions ——
+
+function normalizeAudioBuffer(buffer) {
+  const data = buffer.getChannelData(0);
+  let max = 0;
+  for (let i = 0; i < data.length; i++) {
+    const abs = Math.abs(data[i]);
+    if (abs > max) max = abs;
+  }
+  if (max === 0 || max === 1) return;
+  const multiplier = 1.0 / max;
+  for (let i = 0; i < data.length; i++) {
+    data[i] *= multiplier;
+  }
+}
 
 function handleFile(file) {
   if (!file) return;
 
+  uploadedFile = file;
   if (wavesurfer) wavesurfer.destroy();
   audioBuffer = null;
   silentRegions = [];
   lastBlob = null;
   audioPreview.src = '';
+  videoPreview.src = '';
+  downloadVideoBtn.style.display = 'none';
 
   dropZone.style.display = 'none';
   waveformDiv.style.display = 'block';
@@ -135,22 +139,31 @@ function handleFile(file) {
     const arrayBuffer = e.target.result;
     const ctx = new AudioContext();
     audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+    normalizeAudioBuffer(audioBuffer);
+    precomputedPeaks = computePeaks(audioBuffer);
 
-    // Set dynamic minimum threshold
-    const minThreshold = findMinimumUsefulThreshold(audioBuffer);
-    const minPercent = (minThreshold * 100).toFixed(2);
-
-    thresholdSlider.min = minPercent;
-    thresholdInput.min = minPercent;
-    thresholdSlider.value = minPercent;
-    thresholdInput.value = minPercent;
-
-    handleThresholdChange(); // calculate first regions
+    handleThresholdChange(); // calculate initial regions
     drawRegions();
 
     wavesurfer.loadDecodedBuffer(audioBuffer);
   };
   reader.readAsArrayBuffer(file);
+}
+
+function computePeaks(buffer) {
+  const data = buffer.getChannelData(0);
+  const sampleRate = buffer.sampleRate;
+  const peaks = [];
+  const numberOfPeaks = 8000;
+
+  const samplesPerChunk = Math.floor(data.length / numberOfPeaks);
+  for (let i = 0; i < data.length; i += samplesPerChunk) {
+    const slice = data.slice(i, i + samplesPerChunk);
+    const peak = Math.max(...slice.map(Math.abs));
+    const time = i / sampleRate;
+    peaks.push({ time, peak });
+  }
+  return peaks;
 }
 
 function handleThresholdChange() {
@@ -165,23 +178,18 @@ function handleShrinkChange() {
 
 function markSilentRegions() {
   const raw = +thresholdSlider.value / 100;
-  const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1); 
+  const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
   const threshold = mapped * mapped;
   const shrinkMs = +shrinkSlider.value;
-
-  const data = audioBuffer.getChannelData(0);
-  const sampleRate = audioBuffer.sampleRate;
-  const precision = isDragging ? 3 : 100; // Use low precision when dragging
-  const samplesPerPixel = Math.floor(sampleRate / precision);
 
   let silent = false;
   let currentRegion = null;
   silentRegions = [];
 
-  for (let i = 0; i < data.length; i += samplesPerPixel) {
-    const slice = data.slice(i, i + samplesPerPixel);
-    const max = Math.max(...slice.map(Math.abs));
-    const time = i / sampleRate;
+  for (let i = 0; i < precomputedPeaks.length; i++) {
+    const peakData = precomputedPeaks[i];
+    const max = peakData.peak;
+    const time = peakData.time;
 
     if (max < threshold) {
       if (!silent) {
@@ -200,15 +208,15 @@ function markSilentRegions() {
   }
 
   if (silent && currentRegion) {
-    currentRegion.end = data.length / sampleRate;
+    currentRegion.end = audioBuffer.duration;
     if ((currentRegion.end - currentRegion.start) > 0.05) {
       silentRegions.push(currentRegion);
     }
   }
+
   applyShrinkFilter(shrinkMs);
-  mergeOverlappingRegions();
   drawRegions();
-  updateStats(); // update statistics every time regions change
+  updateStats();
 }
 
 function applyShrinkFilter(shrinkMs) {
@@ -220,23 +228,6 @@ function applyShrinkFilter(shrinkMs) {
       return start < end ? { start, end } : null;
     })
     .filter(region => region && (region.end - region.start) > 0.01);
-}
-
-function mergeOverlappingRegions() {
-  if (silentRegions.length <= 1) return;
-  silentRegions.sort((a, b) => a.start - b.start);
-
-  const merged = [silentRegions[0]];
-  for (let i = 1; i < silentRegions.length; i++) {
-    const last = merged[merged.length - 1];
-    const current = silentRegions[i];
-    if (current.start <= last.end) {
-      last.end = Math.max(last.end, current.end);
-    } else {
-      merged.push(current);
-    }
-  }
-  silentRegions = merged;
 }
 
 function drawRegions() {
@@ -262,10 +253,10 @@ function updateStats() {
   });
   const timeSaved = totalSilence.toFixed(2);
   const percentSaved = (originalDuration ? (timeSaved / originalDuration * 100) : 0).toFixed(1);
-
   statsPanel.innerText = `Time saved: ${timeSaved}s - ${percentSaved}% shorter - ${silentRegions.length} silence regions`;
 }
 
+// —— AUDIO CUTTING (existing) ——
 function cutAudio() {
   if (!audioBuffer) return;
 
@@ -309,8 +300,6 @@ function cutAudio() {
       audioPreview.src = URL.createObjectURL(blob);
     });
   }
-
-  generateScripts(); // Update Bash + PowerShell scripts
 }
 
 function encodeWAV(buffer) {
@@ -391,37 +380,135 @@ function encodeMP3(buffer) {
   return new Blob(data, { type: 'audio/mp3' });
 }
 
-function generateScripts() {
-  let bash = '#!/bin/bash\n\n';
-  let ps = '### PowerShell Script\n\n';
 
-  silentRegions.forEach((region, idx) => {
-    bash += `# Cut ${idx+1}\nffmpeg -i input.mp4 -ss ${region.start.toFixed(2)} -to ${region.end.toFixed(2)} -c copy part${idx+1}.mp4\n\n`;
-    ps += `# Cut ${idx+1}\nffmpeg -i input.mp4 -ss ${region.start.toFixed(2)} -to ${region.end.toFixed(2)} -c copy part${idx+1}.mp4\n\n`;
+async function cutVideo() {
+  if (!uploadedFile) {
+      alert('Please upload a video first!');
+      return;
+  }
+
+  // Initialize ffmpeg if needed
+  if (!ffmpegLoaded) {
+      await ffmpeg.load();
+      ffmpegLoaded = true;
+  }
+
+  processingIndicator.style.display = 'block'; // (optional) show processing indicator
+
+  // Load the uploaded file into ffmpeg memory
+  const arrayBuffer = await uploadedFile.arrayBuffer();
+  await ffmpeg.writeFile('input.mp4', new Uint8Array(arrayBuffer));
+
+  const nonSilentRegions = calculateNonSilentRanges(); // you probably want this (not silentRegions)
+
+  if (nonSilentRegions.length > 0) {
+      // Cut non-silent parts
+      for (let i = 0; i < nonSilentRegions.length; i++) {
+          const start = nonSilentRegions[i].start;
+          const duration = nonSilentRegions[i].end - nonSilentRegions[i].start;
+
+          await ffmpeg.exec([
+              '-i', 'input.mp4',
+              '-ss', start.toFixed(3),
+              '-t',  duration.toFixed(3),
+              '-c:v', 'libx264',
+              '-preset', 'veryfast',
+              '-crf', '23',
+              '-c:a', 'aac',
+              '-b:a', '192k',
+              `part${i}.mp4`
+          ]);
+      }
+
+      // Build concat filter
+      let concatFilter = '';
+      let inputs = [];
+
+      for (let i = 0; i < nonSilentRegions.length; i++) {
+          inputs.push('-i', `part${i}.mp4`);
+          concatFilter += `[${i}:v:0][${i}:a:0]`;
+      }
+      concatFilter += `concat=n=${nonSilentRegions.length}:v=1:a=1[outv][outa]`;
+
+      await ffmpeg.exec([
+          ...inputs,
+          '-filter_complex', concatFilter,
+          '-map', '[outv]',
+          '-map', '[outa]',
+          '-c:v', 'libx264',
+          '-preset', 'veryfast',
+          '-crf', '23',
+          '-c:a', 'aac',
+          '-b:a', '192k',
+          'final.mp4'
+      ]);
+
+      const data = await ffmpeg.readFile('final.mp4');
+      const blob = new Blob([data.buffer], { type: 'video/mp4' });
+      const url = URL.createObjectURL(blob);
+
+      videoPreview.src = url;
+      videoPreview.style.display = 'block';
+      downloadVideoBtn.style.display = 'inline-block';
+      downloadVideoBtn.onclick = () => {
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'final.mp4';
+          a.click();
+      };
+  } else {
+      alert('No non-silent parts found!');
+  }
+
+  processingIndicator.style.display = 'none'; // (optional) hide processing indicator
+}
+
+
+function displayVideoAndDownload(url, filename) {
+  // Remove existing preview and download link if any
+  const existingPreview = document.getElementById('videoPreview');
+  if (existingPreview) existingPreview.remove();
+
+  const existingDownload = document.getElementById('videoDownloadLink');
+  if (existingDownload) existingDownload.remove();
+
+  // Display video preview
+  const videoPreview = document.createElement('video');
+  videoPreview.id = 'videoPreview';
+  videoPreview.src = url;
+  videoPreview.controls = true;
+  videoPreview.style.marginTop = '10px';
+  videoPreview.style.maxWidth = '100%';
+  document.body.appendChild(videoPreview);
+
+  // Display download link
+  const downloadLink = document.createElement('a');
+  downloadLink.id = 'videoDownloadLink';
+  downloadLink.href = url;
+  downloadLink.download = filename;
+  downloadLink.innerText = '⬇ Download Video';
+  downloadLink.style.display = 'block';
+  downloadLink.style.marginTop = '10px';
+  downloadLink.style.fontSize = '18px';
+  document.body.appendChild(downloadLink);
+}
+
+
+function calculateNonSilentRanges() {
+  const originalDuration = audioBuffer ? audioBuffer.duration : 0;
+  let regions = [];
+
+  let lastEnd = 0;
+  silentRegions.forEach(region => {
+      if (region.start > lastEnd) {
+          regions.push({ start: lastEnd, end: region.start });
+      }
+      lastEnd = region.end;
   });
 
-  bashScriptBox.value = bash;
-  psScriptBox.value = ps;
-}
-
-function copyScript(id) {
-  const textarea = document.getElementById(id);
-  textarea.select();
-  document.execCommand('copy');
-}
-
-function findMinimumUsefulThreshold(buffer) {
-  const data = buffer.getChannelData(0);
-  const sampleRate = buffer.sampleRate;
-  const samplesPerChunk = Math.floor(sampleRate / 100);
-  let minNonZeroMax = 1;
-
-  for (let i = 0; i < data.length; i += samplesPerChunk) {
-    const slice = data.slice(i, i + samplesPerChunk);
-    const max = Math.max(...slice.map(Math.abs));
-    if (max > 0.0001 && max < minNonZeroMax) {
-      minNonZeroMax = max;
-    }
+  if (lastEnd < originalDuration) {
+      regions.push({ start: lastEnd, end: originalDuration });
   }
-  return minNonZeroMax;
+
+  return regions;
 }
