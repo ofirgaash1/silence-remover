@@ -94,8 +94,14 @@ audio {
   margin-top: 10px;
   width: 80%;
   max-width: 600px;
+
 }
 
+video {
+  width: 80%;
+  max-width: 600px;
+  margin: 10px auto 0 auto;
+}
 .download-btn {
   margin-top: 20px;
   padding: 10px 20px;
@@ -131,3 +137,18 @@ textarea {
   padding: 10px;
 }
 
+
+
+.downloadVideoBtn {
+  margin-top: 20px;
+  padding: 10px 20px;
+  font-size: 18px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.downloadVideoBtn:hover {
+  background-color: #218838;
+}
