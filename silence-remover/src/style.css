@@ -152,3 +152,41 @@ textarea {
 .downloadVideoBtn:hover {
   background-color: #218838;
 }
+
+
+/* Add or modify in style.css */
+.combined-table { /* Or reuse .time-table */
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 0.9em;
+}
+
+.combined-table th,
+.combined-table td {
+  border: 1px solid #ccc;
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top; /* Align content top if details get long */
+}
+
+.combined-table th {
+  background-color: #f0f0f0;
+  font-weight: bold;
+}
+
+/* Style rows based on event type */
+.event-silent-start td:nth-child(2) { /* Style the 'Event Type' column */
+  color: #d9534f; /* Reddish */
+  font-weight: bold;
+}
+
+.event-sound-start td:nth-child(2) {
+  color: #5cb85c; /* Greenish */
+  font-weight: bold;
+}
+
+.event-keyframe td:nth-child(2) {
+  color: #428bca; /* Blueish */
+  font-weight: bold;
+}

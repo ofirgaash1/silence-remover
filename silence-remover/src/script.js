@@ -219,6 +219,7 @@ function markSilentRegions() {
   applyShrinkFilter(shrinkMs);
   drawRegions();
   updateStats();
+  
 }
 
 function applyShrinkFilter(shrinkMs) {
@@ -235,7 +236,7 @@ function applyShrinkFilter(shrinkMs) {
 function drawRegions() {
   if (!wavesurfer) return;
   Object.values(wavesurfer.regions.list).forEach(region => region.remove());
-
+  
   silentRegions.forEach(region => {
     wavesurfer.addRegion({
       start: region.start,
@@ -416,18 +417,19 @@ function calculateNonSilentRanges() {
 
   let lastEnd = 0;
   silentRegions.forEach(region => {
-      if (region.start > lastEnd) {
-          regions.push({ start: lastEnd, end: region.start });
-      }
-      lastEnd = region.end;
+    if (region.start > lastEnd) {
+      regions.push({ start: lastEnd, end: region.start });
+    }
+    lastEnd = region.end;
   });
 
   if (lastEnd < originalDuration) {
-      regions.push({ start: lastEnd, end: originalDuration });
+    regions.push({ start: lastEnd, end: originalDuration });
   }
 
   return regions;
 }
+
 async function cutVideo() {
   if (!uploadedFile) {
     alert("Please upload a video first!");
@@ -435,96 +437,84 @@ async function cutVideo() {
   }
 
   const nonSilentRegions = calculateNonSilentRanges();
+  console.log("Calculated non-silent regions:", nonSilentRegions);
+
   if (nonSilentRegions.length === 0) {
     alert("No silence detected — full video kept!");
     return;
   }
 
-  processingIndicator.style.display = 'block';
-
   if (!ffmpegLoaded) {
+    console.log("FFmpeg not loaded, loading now...");
     await ffmpeg.load({
       classWorkerURL: new URL('/worker/worker.mjs', window.location.origin).href,
       workerOptions: { type: 'module' }
     });
     ffmpegLoaded = true;
+    console.log("FFmpeg loaded successfully.");
+  } else {
+    console.log("FFmpeg already loaded.");
   }
 
+  console.log("Writing input file to ffmpeg filesystem: input.mp4");
   await ffmpeg.writeFile('input.mp4', await fetchFile(uploadedFile));
+  console.log("Input file written successfully.");
 
-  const videoDuration = audioBuffer.duration;
-  const keyframeTimes = [];
-  const files = [];
+  const segmentFileNames = [];
+  processingIndicator.innerText = 'Cutting non-silent segments...';
+  console.log("Starting to cut non-silent segments...");
 
-  let currentTime = 0;
-  let index = 0;
-
-  while (currentTime < videoDuration - 0.05) {
-    console.log("currentTime " + currentTime + " videoDuration: " + videoDuration);
-    
-    const outputName = `keyseg_${index}.mp4`;
-    const args = [
-      '-ss', currentTime.toFixed(6),
-      '-to', (currentTime + 1).toFixed(6),
-      '-i', 'input.mp4',
-      '-c', 'copy',
-      outputName
-    ];
-
-    try {
-      console.log("index " + index);
-      await ffmpeg.exec(args);
-      console.log("args " + args);
-    } catch (err) {
-      console.error("Failed to cut key segment:", err);
-      break;
-    }
-
-    const duration = await getDuration(outputName);
-    console.log("duration of part " + duration);
-    
-    if (duration < 0.05) break; // Fail-safe
-
-    currentTime += duration;
-    console.log("currentTime " + currentTime);
-    
-    keyframeTimes.push(currentTime);
-    files.push(outputName);
-    index++;
-  }
-
-  console.log("Discovered keyframe times:", keyframeTimes);
-
-  const segments = planSegments(nonSilentRegions, keyframeTimes);
-  console.log("Segments to cut:", segments);
-
-  // Cut segments (copy or reencode)
   try {
-    for (let i = 0; i < segments.length; i++) {
-      console.log(`Cutting segment ${i}:`, segments[i]);
-      await cutSegment(segments[i], i);
+    for (let i = 0; i < nonSilentRegions.length; i++) {
+      const region = nonSilentRegions[i];
+      const outputName = `part${i}.mp4`;
+      segmentFileNames.push(outputName);
+      const args = [
+        '-ss', region.start.toFixed(6),
+        '-to', region.end.toFixed(6),
+        '-i', 'input.mp4',
+        '-c', 'copy',
+        outputName
+      ];
+      console.log(`Executing ffmpeg for segment ${i}:`, args);
+      await ffmpeg.exec(args);
+      console.log(`Segment ${i} (${outputName}) created successfully.`);
+      const filesAfterCut = await ffmpeg.listDir('/');
+      console.log(`Files in ffmpeg filesystem after cutting segment ${i}:`, filesAfterCut);
+
+      // Attempt to read the file immediately after writing
+      console.log(`Attempting to read back segment ${outputName} immediately after writing...`);
+      try {
+        const data = await ffmpeg.readFile(outputName);
+        console.log(`Successfully read back segment ${outputName}. Size: ${data.length}`);
+      } catch (readErr) {
+        console.error(`Error reading back segment ${outputName}:`, readErr);
+      }
+      const filesAfterReadBack = await ffmpeg.listDir('/');
+      console.log(`Filesystem after reading back segment ${outputName}:`, filesAfterReadBack);
     }
+    console.log("Finished cutting all non-silent segments. Generated filenames:", segmentFileNames);
   } catch (err) {
-    console.error("Cutting failed:", err);
+    console.error("Failed to cut segments:", err);
     alert("Segment cutting failed. Check the console.");
-    processingIndicator.style.display = 'none';
     return;
   }
 
-  // Concat all processed segments
+  processingIndicator.innerText = 'Concatenating segments...';
+  console.log("Calling concatSegments with filenames:", segmentFileNames);
+
   try {
-    console.log("Attempting to concat segments...");
-    await concatSegments(segments.length);
-    console.log("Concat finished");
+    await concatSegments(segmentFileNames);
+    console.log("Concatenation completed successfully.");
   } catch (err) {
     console.error("Concat failed:", err);
-    alert("Concat step failed. Check the console.");
-    processingIndicator.style.display = 'none';
+    alert("Concatenation failed. Check the console.");
     return;
   }
 
   // Load final video
   try {
+    console.log("Reading final.mp4 from ffmpeg filesystem...");
     const data = await ffmpeg.readFile('final.mp4');
     const blob = new Blob([data.buffer], { type: 'video/mp4' });
     const url = URL.createObjectURL(blob);
@@ -538,96 +528,51 @@ async function cutVideo() {
       a.download = 'final.mp4';
       a.click();
     };
+    console.log("Final video loaded and URL created.");
   } catch (err) {
     console.error("Failed to load final video:", err);
     alert("Could not load final output. Check console.");
   }
-
-  processingIndicator.style.display = 'none';
 }
 
-async function getDuration(filename, timeout = 3000) {
-  return new Promise(async (resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`getDuration timed out for ${filename}`));
-    }, timeout);
-
-    try {
-      const outputFile = `dur_${Date.now()}.txt`;
-      await ffmpeg.ffprobe([
-        '-v', 'error',
-        '-show_entries', 'format=duration',
-        '-of', 'default=noprint_wrappers=1:nokey=1',
-        filename,
-        '-o', outputFile
-      ]);
-
-      const result = await ffmpeg.readFile(outputFile, 'utf8');
-      clearTimeout(timer);
-
-      const value = parseFloat(result);
-      if (isNaN(value)) throw new Error("Duration is NaN");
-      resolve(value);
-    } catch (e) {
-      clearTimeout(timer);
-      reject(e);
-    }
-  });
-}
-
-
-async function concatSegments(count) {
-  console.log(`Starting concat of ${count} segments...`);
-
-  const inputArgs = [];
-  const concatFilterParts = [];
-
-  const files = await ffmpeg.listDir('/');
-  console.log("FFmpeg FS before concat:", files);
-
-  // ✅ Verify each input file exists
-  for (let i = 0; i < count; i++) {
-    const filename = `part${i}.mp4`;
-    if (!files.includes(filename)) {
-      console.error(`Missing input segment: ${filename}`);
-      throw new Error(`Cannot concat: segment ${filename} not found`);
-    }
-
-    inputArgs.push('-i', filename);
-    concatFilterParts.push(`[${i}:v:0][${i}:a:0]`);
-  }
-
-  const concatFilter = `${concatFilterParts.join('')}concat=n=${count}:v=1:a=1[outv][outa]`;
-
-  const ffmpegArgs = [
-    ...inputArgs,
-    '-filter_complex', concatFilter,
-    '-map', '[outv]',
-    '-map', '[outa]',
-    '-c:v', 'libx264',
-    '-preset', 'veryfast',
-    '-crf', '23',
-    '-c:a', 'aac',
-    '-b:a', '192k',
-    'final.mp4'
-  ];
-
-  console.log("Running FFmpeg concat with args:", ffmpegArgs);
+async function concatSegments(fileNames) {
+  console.log("--- START concatSegments (Corrected) ---");
+  console.log("Input filenames:", fileNames);
 
   try {
-    await ffmpeg.exec(ffmpegArgs);
-    const afterFiles = await ffmpeg.listDir('/');
-    console.log("FS after concat:", afterFiles);
+    // Generate list.txt content
+    const listContent = fileNames.map(name => `file '${name}'`).join('\n');
+    
+    // Write list.txt to FFmpeg filesystem
+    console.log("Writing list.txt to FFmpeg FS");
+    await ffmpeg.writeFile('list.txt', listContent);
+    console.log("list.txt written successfully");
 
-    if (!afterFiles.includes('final.mp4')) {
-      throw new Error("Concat step ran but did not produce final.mp4");
+    // FFmpeg arguments for concat demuxer
+    const ffmpegArgs = [
+      '-f', 'concat',      // Use concat demuxer
+      '-safe', '0',        // Allow "unsafe" filenames
+      '-i', 'list.txt',    // Input list file
+      '-c', 'copy',        // Stream copy (no re-encode)
+      'final.mp4'
+    ];
+
+    console.log("Executing ffmpeg with concat demuxer:", ffmpegArgs);
+    await ffmpeg.exec(ffmpegArgs);
+
+    // Verify output exists
+    const filesAfterConcat = await ffmpeg.listDir('/');
+    if (!filesAfterConcat.some(entry => entry.name === 'final.mp4')) {
+      throw new Error("final.mp4 not created");
     }
 
-    console.log("✅ Concat succeeded. Final video ready.");
+    console.log("Concatenation successful! final.mp4 created");
+    console.log("--- END concatSegments (Corrected) ---");
+    
   } catch (err) {
-    console.error("❌ Concat failed:", err);
-    const afterFailFiles = await ffmpeg.listDir('/');
-    console.log("❌ FS after failed concat:", afterFailFiles);
-    throw new Error("Concat step failed. See console for details.");
+    console.error("Concat failed:", err);
+    console.log("Filesystem state after failure:", await ffmpeg.listDir('/'));
+    throw new Error(`Concatenation failed: ${err.message}`);
   }
 }
+

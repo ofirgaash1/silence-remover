@@ -39,6 +39,12 @@
     </div>
   </div>
 
+  <button id="downloadVideoBtn" style="display:none;">Download Video</button>
+
+  <h3>Combined Timeline Events:</h3>
+  <div id="combinedTableContainer">
+      </div>
+  
   <div class="format-controls">
     <label>Audio Output Format:</label>
     <button class="fmt-btn selected" data-format="mp3">MP3 ✓</button>
@@ -70,6 +76,8 @@
 
 <!-- Processing Indicator -->
 <div id="processingIndicator" style="display:none;">Processing, please wait...</div>
+
+
 
 <!-- Script dependencies -->
 <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
