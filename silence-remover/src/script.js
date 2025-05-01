@@ -1,16 +1,27 @@
-// —— Globals ——
+
+
 let wavesurfer = null;
 let audioBuffer = null;
 let silentRegions = [];
 let lastBlob = null;
-let outputFormat = 'mp3'; // default
+let outputFormat = 'mp3';
 let precomputedPeaks = [];
 let uploadedFile = null;
 
-const ffmpeg = new FFmpegWASM.FFmpeg({ log: true });
-let ffmpegLoaded = false; // track loading state
+let ffmpeg;
+let fetchFile;
+let ffmpegLoaded = false;
 
-// —— Element references ——
+export async function main() {
+  const { createFFmpeg, fetchFile: ffetch } = window.FFmpegLib;
+  ffmpeg = createFFmpeg({ log: true });  
+  fetchFile = ffetch;
+
+  setupUIEvents();
+
+  
+}
+
 const dropZone = document.getElementById('drop-zone');
 const waveformDiv = document.getElementById('waveform');
 const browseBtn = document.getElementById('browseBtn');
@@ -20,82 +31,73 @@ const thresholdInput = document.getElementById('thresholdInput');
 const shrinkSlider = document.getElementById('shrinkSlider');
 const shrinkInput = document.getElementById('shrinkInput');
 const formatButtons = document.querySelectorAll('.fmt-btn');
-const exportButton = document.getElementById('exportRanges');
 const cutButton = document.getElementById('cutAudio');
 const audioPreview = document.getElementById('audioPreview');
 const downloadBtn = document.getElementById('downloadBtn');
-const statsPanel = document.getElementById('statsPanel');
-const videoPreview = document.getElementById('videoPreview');
 const cutVideoBtn = document.getElementById('cutVideoBtn');
 const downloadVideoBtn = document.getElementById('downloadVideoBtn');
-const processingIndicator = document.getElementById('processingIndicator');
+const statsPanel = document.getElementById('statsPanel');
 
-// —— Setup UI Events ——
-browseBtn.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+function setupUIEvents() {
+  
 
-dropZone.addEventListener('dragover', e => {
-  e.preventDefault();
-  dropZone.classList.add('dragover');
-});
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  dropZone.classList.remove('dragover');
-  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-});
+  browseBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
 
-// Threshold sliders
-thresholdSlider.addEventListener('input', e => {
-  thresholdInput.value = e.target.value;
-  handleThresholdChange();
-});
-thresholdInput.addEventListener('input', e => {
-  thresholdSlider.value = e.target.value;
-  handleThresholdChange();
-});
-
-// Shrink sliders
-shrinkSlider.addEventListener('input', e => {
-  shrinkInput.value = e.target.value;
-  handleShrinkChange();
-});
-shrinkInput.addEventListener('input', e => {
-  shrinkSlider.value = e.target.value;
-  handleShrinkChange();
-});
-
-// Format buttons
-formatButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
-    formatButtons.forEach(b => {
-      b.classList.remove('selected');
-      b.innerText = b.dataset.format.toUpperCase();
-    });
-    btn.classList.add('selected');
-    btn.innerText = `${btn.dataset.format.toUpperCase()} ✓`;
-    outputFormat = btn.dataset.format;
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
   });
-});
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
 
-// Audio cut button
-cutButton.addEventListener('click', cutAudio);
+  thresholdSlider.addEventListener('input', e => {
+    thresholdInput.value = e.target.value;
+    handleThresholdChange();
+  });
+  thresholdInput.addEventListener('input', e => {
+    thresholdSlider.value = e.target.value;
+    handleThresholdChange();
+  });
 
-// Download audio
-downloadBtn.addEventListener('click', () => {
-  if (!lastBlob) return;
-  const url = URL.createObjectURL(lastBlob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `edited-audio.${outputFormat}`;
-  a.click();
-  URL.revokeObjectURL(url);
-});
+  shrinkSlider.addEventListener('input', e => {
+    shrinkInput.value = e.target.value;
+    handleShrinkChange();
+  });
+  shrinkInput.addEventListener('input', e => {
+    shrinkSlider.value = e.target.value;
+    handleShrinkChange();
+  });
 
-// Video cut button
-cutVideoBtn.addEventListener('click', cutVideo);
+  formatButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      formatButtons.forEach(b => {
+        b.classList.remove('selected');
+        b.innerText = b.dataset.format.toUpperCase();
+      });
+      btn.classList.add('selected');
+      btn.innerText = `${btn.dataset.format.toUpperCase()} ✓`;
+      outputFormat = btn.dataset.format;
+    });
+  });
 
-// —— Core functions ——
+  cutButton.addEventListener('click', cutAudio);
+  downloadBtn.addEventListener('click', () => {
+    if (!lastBlob) return;
+    const url = URL.createObjectURL(lastBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `edited-audio.${outputFormat}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  cutVideoBtn.addEventListener('click', cutVideo);
+}
 
 function normalizeAudioBuffer(buffer) {
   const data = buffer.getChannelData(0);
@@ -256,7 +258,6 @@ function updateStats() {
   statsPanel.innerText = `Time saved: ${timeSaved}s - ${percentSaved}% shorter - ${silentRegions.length} silence regions`;
 }
 
-// —— AUDIO CUTTING (existing) ——
 function cutAudio() {
   if (!audioBuffer) return;
 
@@ -380,90 +381,6 @@ function encodeMP3(buffer) {
   return new Blob(data, { type: 'audio/mp3' });
 }
 
-
-async function cutVideo() {
-  if (!uploadedFile) {
-      alert('Please upload a video first!');
-      return;
-  }
-
-  // Initialize ffmpeg if needed
-  if (!ffmpegLoaded) {
-      await ffmpeg.load();
-      ffmpegLoaded = true;
-  }
-
-  processingIndicator.style.display = 'block'; // (optional) show processing indicator
-
-  // Load the uploaded file into ffmpeg memory
-  const arrayBuffer = await uploadedFile.arrayBuffer();
-  await ffmpeg.writeFile('input.mp4', new Uint8Array(arrayBuffer));
-
-  const nonSilentRegions = calculateNonSilentRanges(); // you probably want this (not silentRegions)
-
-  if (nonSilentRegions.length > 0) {
-      // Cut non-silent parts
-      for (let i = 0; i < nonSilentRegions.length; i++) {
-          const start = nonSilentRegions[i].start;
-          const duration = nonSilentRegions[i].end - nonSilentRegions[i].start;
-
-          await ffmpeg.exec([
-              '-i', 'input.mp4',
-              '-ss', start.toFixed(3),
-              '-t',  duration.toFixed(3),
-              '-c:v', 'libx264',
-              '-preset', 'veryfast',
-              '-crf', '23',
-              '-c:a', 'aac',
-              '-b:a', '192k',
-              `part${i}.mp4`
-          ]);
-      }
-
-      // Build concat filter
-      let concatFilter = '';
-      let inputs = [];
-
-      for (let i = 0; i < nonSilentRegions.length; i++) {
-          inputs.push('-i', `part${i}.mp4`);
-          concatFilter += `[${i}:v:0][${i}:a:0]`;
-      }
-      concatFilter += `concat=n=${nonSilentRegions.length}:v=1:a=1[outv][outa]`;
-
-      await ffmpeg.exec([
-          ...inputs,
-          '-filter_complex', concatFilter,
-          '-map', '[outv]',
-          '-map', '[outa]',
-          '-c:v', 'libx264',
-          '-preset', 'veryfast',
-          '-crf', '23',
-          '-c:a', 'aac',
-          '-b:a', '192k',
-          'final.mp4'
-      ]);
-
-      const data = await ffmpeg.readFile('final.mp4');
-      const blob = new Blob([data.buffer], { type: 'video/mp4' });
-      const url = URL.createObjectURL(blob);
-
-      videoPreview.src = url;
-      videoPreview.style.display = 'block';
-      downloadVideoBtn.style.display = 'inline-block';
-      downloadVideoBtn.onclick = () => {
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'final.mp4';
-          a.click();
-      };
-  } else {
-      alert('No non-silent parts found!');
-  }
-
-  processingIndicator.style.display = 'none'; // (optional) hide processing indicator
-}
-
-
 function displayVideoAndDownload(url, filename) {
   // Remove existing preview and download link if any
   const existingPreview = document.getElementById('videoPreview');
@@ -493,7 +410,6 @@ function displayVideoAndDownload(url, filename) {
   document.body.appendChild(downloadLink);
 }
 
-
 function calculateNonSilentRanges() {
   const originalDuration = audioBuffer ? audioBuffer.duration : 0;
   let regions = [];
@@ -511,4 +427,207 @@ function calculateNonSilentRanges() {
   }
 
   return regions;
+}
+async function cutVideo() {
+  if (!uploadedFile) {
+    alert("Please upload a video first!");
+    return;
+  }
+
+  const nonSilentRegions = calculateNonSilentRanges();
+  if (nonSilentRegions.length === 0) {
+    alert("No silence detected — full video kept!");
+    return;
+  }
+
+  processingIndicator.style.display = 'block';
+
+  if (!ffmpegLoaded) {
+    await ffmpeg.load({
+      classWorkerURL: new URL('/worker/worker.mjs', window.location.origin).href,
+      workerOptions: { type: 'module' }
+    });
+    ffmpegLoaded = true;
+  }
+
+  await ffmpeg.writeFile('input.mp4', await fetchFile(uploadedFile));
+
+  const videoDuration = audioBuffer.duration;
+  const keyframeTimes = [];
+  const files = [];
+
+  let currentTime = 0;
+  let index = 0;
+
+  while (currentTime < videoDuration - 0.05) {
+    console.log("currentTime " + currentTime + " videoDuration: " + videoDuration);
+    
+    const outputName = `keyseg_${index}.mp4`;
+    const args = [
+      '-ss', currentTime.toFixed(6),
+      '-to', (currentTime + 1).toFixed(6),
+      '-i', 'input.mp4',
+      '-c', 'copy',
+      outputName
+    ];
+
+    try {
+      console.log("index " + index);
+      await ffmpeg.exec(args);
+      console.log("args " + args);
+    } catch (err) {
+      console.error("Failed to cut key segment:", err);
+      break;
+    }
+
+    const duration = await getDuration(outputName);
+    console.log("duration of part " + duration);
+    
+    if (duration < 0.05) break; // Fail-safe
+
+    currentTime += duration;
+    console.log("currentTime " + currentTime);
+    
+    keyframeTimes.push(currentTime);
+    files.push(outputName);
+    index++;
+  }
+
+  console.log("Discovered keyframe times:", keyframeTimes);
+
+  const segments = planSegments(nonSilentRegions, keyframeTimes);
+  console.log("Segments to cut:", segments);
+
+  // Cut segments (copy or reencode)
+  try {
+    for (let i = 0; i < segments.length; i++) {
+      console.log(`Cutting segment ${i}:`, segments[i]);
+      await cutSegment(segments[i], i);
+    }
+  } catch (err) {
+    console.error("Cutting failed:", err);
+    alert("Segment cutting failed. Check the console.");
+    processingIndicator.style.display = 'none';
+    return;
+  }
+
+  // Concat all processed segments
+  try {
+    console.log("Attempting to concat segments...");
+    await concatSegments(segments.length);
+    console.log("Concat finished");
+  } catch (err) {
+    console.error("Concat failed:", err);
+    alert("Concat step failed. Check the console.");
+    processingIndicator.style.display = 'none';
+    return;
+  }
+
+  // Load final video
+  try {
+    const data = await ffmpeg.readFile('final.mp4');
+    const blob = new Blob([data.buffer], { type: 'video/mp4' });
+    const url = URL.createObjectURL(blob);
+
+    videoPreview.src = url;
+    videoPreview.style.display = 'block';
+    downloadVideoBtn.style.display = 'inline-block';
+    downloadVideoBtn.onclick = () => {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'final.mp4';
+      a.click();
+    };
+  } catch (err) {
+    console.error("Failed to load final video:", err);
+    alert("Could not load final output. Check console.");
+  }
+
+  processingIndicator.style.display = 'none';
+}
+
+async function getDuration(filename, timeout = 3000) {
+  return new Promise(async (resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`getDuration timed out for ${filename}`));
+    }, timeout);
+
+    try {
+      const outputFile = `dur_${Date.now()}.txt`;
+      await ffmpeg.ffprobe([
+        '-v', 'error',
+        '-show_entries', 'format=duration',
+        '-of', 'default=noprint_wrappers=1:nokey=1',
+        filename,
+        '-o', outputFile
+      ]);
+
+      const result = await ffmpeg.readFile(outputFile, 'utf8');
+      clearTimeout(timer);
+
+      const value = parseFloat(result);
+      if (isNaN(value)) throw new Error("Duration is NaN");
+      resolve(value);
+    } catch (e) {
+      clearTimeout(timer);
+      reject(e);
+    }
+  });
+}
+
+
+async function concatSegments(count) {
+  console.log(`Starting concat of ${count} segments...`);
+
+  const inputArgs = [];
+  const concatFilterParts = [];
+
+  const files = await ffmpeg.listDir('/');
+  console.log("FFmpeg FS before concat:", files);
+
+  // ✅ Verify each input file exists
+  for (let i = 0; i < count; i++) {
+    const filename = `part${i}.mp4`;
+    if (!files.includes(filename)) {
+      console.error(`Missing input segment: ${filename}`);
+      throw new Error(`Cannot concat: segment ${filename} not found`);
+    }
+
+    inputArgs.push('-i', filename);
+    concatFilterParts.push(`[${i}:v:0][${i}:a:0]`);
+  }
+
+  const concatFilter = `${concatFilterParts.join('')}concat=n=${count}:v=1:a=1[outv][outa]`;
+
+  const ffmpegArgs = [
+    ...inputArgs,
+    '-filter_complex', concatFilter,
+    '-map', '[outv]',
+    '-map', '[outa]',
+    '-c:v', 'libx264',
+    '-preset', 'veryfast',
+    '-crf', '23',
+    '-c:a', 'aac',
+    '-b:a', '192k',
+    'final.mp4'
+  ];
+
+  console.log("Running FFmpeg concat with args:", ffmpegArgs);
+
+  try {
+    await ffmpeg.exec(ffmpegArgs);
+    const afterFiles = await ffmpeg.listDir('/');
+    console.log("FS after concat:", afterFiles);
+
+    if (!afterFiles.includes('final.mp4')) {
+      throw new Error("Concat step ran but did not produce final.mp4");
+    }
+
+    console.log("✅ Concat succeeded. Final video ready.");
+  } catch (err) {
+    console.error("❌ Concat failed:", err);
+    const afterFailFiles = await ffmpeg.listDir('/');
+    console.log("❌ FS after failed concat:", afterFailFiles);
+    throw new Error("Concat step failed. See console for details.");
+  }
 }
