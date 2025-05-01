@@ -21,7 +21,7 @@ export async function main() {
 
   
 }
-
+const title = document.getElementById('title');
 const dropZone = document.getElementById('drop-zone');
 const waveformDiv = document.getElementById('waveform');
 const browseBtn = document.getElementById('browseBtn');
@@ -38,8 +38,8 @@ const cutVideoBtn = document.getElementById('cutVideoBtn');
 const downloadVideoBtn = document.getElementById('downloadVideoBtn');
 const statsPanel = document.getElementById('statsPanel');
 
+
 function setupUIEvents() {
-  
 
   browseBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
@@ -100,15 +100,18 @@ function setupUIEvents() {
 }
 
 function normalizeAudioBuffer(buffer) {
+  
   const data = buffer.getChannelData(0);
   let max = 0;
   for (let i = 0; i < data.length; i++) {
+    title.innerText = `Normalizing audio: ${i} / ${data.length}`
     const abs = Math.abs(data[i]);
     if (abs > max) max = abs;
   }
   if (max === 0 || max === 1) return;
   const multiplier = 1.0 / max;
   for (let i = 0; i < data.length; i++) {
+    title.innerText = `Normalizing audio: ${i} / ${data.length}`
     data[i] *= multiplier;
   }
 }
@@ -137,6 +140,7 @@ function handleFile(file) {
   });
 
   const reader = new FileReader();
+  // here, the website 'stuck'
   reader.onload = async e => {
     const arrayBuffer = e.target.result;
     const ctx = new AudioContext();
@@ -148,6 +152,7 @@ function handleFile(file) {
     drawRegions();
 
     wavesurfer.loadDecodedBuffer(audioBuffer);
+
   };
   reader.readAsArrayBuffer(file);
 }
@@ -160,6 +165,7 @@ function computePeaks(buffer) {
 
   const samplesPerChunk = Math.floor(data.length / numberOfPeaks);
   for (let i = 0; i < data.length; i += samplesPerChunk) {
+    title.innerText = `Computing peaks: ${i} / ${data.length}`
     const slice = data.slice(i, i + samplesPerChunk);
     const peak = Math.max(...slice.map(Math.abs));
     const time = i / sampleRate;
@@ -189,6 +195,7 @@ function markSilentRegions() {
   silentRegions = [];
 
   for (let i = 0; i < precomputedPeaks.length; i++) {
+    title.innerText = `Marking silent regions: ${i} / ${precomputedPeaks.length}`
     const peakData = precomputedPeaks[i];
     const max = peakData.peak;
     const time = peakData.time;
@@ -224,10 +231,24 @@ function markSilentRegions() {
 
 function applyShrinkFilter(shrinkMs) {
   const shrink = shrinkMs / 1000;
+  const duration = audioBuffer ? audioBuffer.duration : 0;
+  
   silentRegions = silentRegions
     .map(region => {
-      let start = region.start + shrink;
-      let end = region.end - shrink;
+      let start = region.start;
+      let end = region.end;
+      
+      // Only shrink start if it's not at 0
+      if (region.start > 0) {
+        start = region.start + shrink;
+      }
+      
+      // Only shrink end if it's not at duration
+      if (region.end < duration) {
+        end = region.end - shrink;
+      }
+      
+      // Return null if invalid region after shrinking
       return start < end ? { start, end } : null;
     })
     .filter(region => region && (region.end - region.start) > 0.01);
@@ -437,7 +458,7 @@ async function cutVideo() {
   }
 
   const nonSilentRegions = calculateNonSilentRanges();
-  console.log("Calculated non-silent regions:", nonSilentRegions);
+  console.log("Calculadted non-silent regions:", nonSilentRegions);
 
   if (nonSilentRegions.length === 0) {
     alert("No silence detected — full video kept!");
@@ -469,13 +490,35 @@ async function cutVideo() {
       const region = nonSilentRegions[i];
       const outputName = `part${i}.mp4`;
       segmentFileNames.push(outputName);
+
+      wavesurfer.addRegion({
+        start: region.start,
+        end: region.end,
+        color: 'rgba(0, 255, 0, 0.7)',
+        drag: false,
+        resize: false
+      });
+      
       const args = [
         '-ss', region.start.toFixed(6),
-        '-to', region.end.toFixed(6),
         '-i', 'input.mp4',
-        '-c', 'copy',
+        '-to', (region.end - region.start).toFixed(6),
+        // VIDEO
+        '-c:v', 'libx264',          // Standard YouTube codec
+        '-crf', '20',               // Sweet spot for YouTube-like quality
+        '-preset', 'ultrafast',        // No size compression - around 2.5 larger files than input
+        '-profile:v', 'high',       // YouTube-compatible profile
+        '-pix_fmt', 'yuv420p',      // Standard YouTube pixel format
+        '-movflags', '+faststart',  // Enable streaming
+        // AUDIO
+        '-c:a', 'aac',              // YouTube's audio codec
+        '-b:a', '128k',             // YouTube-standard bitrate
+        // PERFORMANCE
+        '-threads', '0',            // Use all CPU cores
+        '-avoid_negative_ts', '1',
         outputName
       ];
+      
       console.log(`Executing ffmpeg for segment ${i}:`, args);
       await ffmpeg.exec(args);
       console.log(`Segment ${i} (${outputName}) created successfully.`);
