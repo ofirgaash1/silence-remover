@@ -24,7 +24,7 @@ export async function main() {
 const title = document.getElementById('title');
 const dropZone = document.getElementById('drop-zone');
 const waveformDiv = document.getElementById('waveform');
-const browseBtn = document.getElementById('browseBtn');
+const browseBtn = document.getElementById('drop-zone');
 const fileInput = document.getElementById('audioFile');
 const thresholdSlider = document.getElementById('thresholdSlider');
 const thresholdInput = document.getElementById('thresholdInput');
@@ -33,14 +33,20 @@ const shrinkInput = document.getElementById('shrinkInput');
 const formatButtons = document.querySelectorAll('.fmt-btn');
 const cutButton = document.getElementById('cutAudio');
 const audioPreview = document.getElementById('audioPreview');
-const downloadBtn = document.getElementById('downloadBtn');
+const downloadBtn = document.getElementById('AudioDownloadBtn');
 const cutVideoBtn = document.getElementById('cutVideoBtn');
 const downloadVideoBtn = document.getElementById('downloadVideoBtn');
 const statsPanel = document.getElementById('statsPanel');
-
+const vidTitle = document.getElementById('vidTitle');
+const audioTitle = document.getElementById('audioTitle');
 
 function setupUIEvents() {
-
+  downloadVideoBtn.style.display = 'none';
+  vidTitle.style.display = 'none';
+  audioTitle.style.display = 'none';
+  audioPreview.style.display = 'none';
+  downloadBtn.style.display = 'none';
+  
   browseBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
 
@@ -72,7 +78,6 @@ function setupUIEvents() {
     shrinkSlider.value = e.target.value;
     handleShrinkChange();
   });
-
   formatButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       formatButtons.forEach(b => {
@@ -104,20 +109,20 @@ function normalizeAudioBuffer(buffer) {
   const data = buffer.getChannelData(0);
   let max = 0;
   for (let i = 0; i < data.length; i++) {
-    title.innerText = `Normalizing audio: ${i} / ${data.length}`
     const abs = Math.abs(data[i]);
     if (abs > max) max = abs;
   }
   if (max === 0 || max === 1) return;
   const multiplier = 1.0 / max;
   for (let i = 0; i < data.length; i++) {
-    title.innerText = `Normalizing audio: ${i} / ${data.length}`
     data[i] *= multiplier;
   }
 }
 
 function handleFile(file) {
   if (!file) return;
+
+  console.log(`Starting file processing for: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
 
   uploadedFile = file;
   if (wavesurfer) wavesurfer.destroy();
@@ -126,7 +131,6 @@ function handleFile(file) {
   lastBlob = null;
   audioPreview.src = '';
   videoPreview.src = '';
-  downloadVideoBtn.style.display = 'none';
 
   dropZone.style.display = 'none';
   waveformDiv.style.display = 'block';
@@ -136,25 +140,65 @@ function handleFile(file) {
     waveColor: 'blue',
     progressColor: 'blue',
     backend: 'WebAudio',
-    plugins: [ WaveSurfer.regions.create({}) ]
+    plugins: [WaveSurfer.regions.create({})]
   });
 
   const reader = new FileReader();
-  // here, the website 'stuck'
-  reader.onload = async e => {
-    const arrayBuffer = e.target.result;
-    const ctx = new AudioContext();
-    audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-    normalizeAudioBuffer(audioBuffer);
-    precomputedPeaks = computePeaks(audioBuffer);
-
-    handleThresholdChange(); // calculate initial regions
-    drawRegions();
-
-    wavesurfer.loadDecodedBuffer(audioBuffer);
-
+  
+  // Add progress event listener
+  reader.onprogress = (e) => {
+    if (e.lengthComputable) {
+      const percentLoaded = Math.round((e.loaded / e.total) * 100);
+      title.innerText = `Loading file... ${percentLoaded}%`;
+    }
   };
+
+  title.innerText = "test1"
+
+  reader.onloadstart = () => {
+    console.log("File reading started");
+    title.innerText = "Starting file load...";
+  };
+title.innerText = "test2"
+  reader.onload = async e => {
+    console.log("File fully loaded into memory");
+    try {
+      const arrayBuffer = e.target.result;
+      const ctx = new AudioContext();
+      title.innerText = "Decoding audio... (Takes a few seconds)";
+      audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      title.innerText = "Audio decoded, normalizing...";
+      normalizeAudioBuffer(audioBuffer);
+      precomputedPeaks = computePeaks(audioBuffer);
+      
+      console.log("Processing regions...");
+      handleThresholdChange();
+      drawRegions();
+      
+      console.log("Loading waveform...");
+      wavesurfer.loadDecodedBuffer(audioBuffer);
+      
+      processingIndicator.innerText = "";
+      console.log("File processing complete");
+    } catch (err) {
+      console.error("Processing error:", err);
+      processingIndicator.innerText = "Error processing file";
+    }
+  };
+
+  reader.onerror = () => {
+    console.error("FileReader error:", reader.error);
+    processingIndicator.innerText = "File loading failed";
+  };
+
+  reader.onabort = () => {
+    console.warn("File reading aborted");
+    processingIndicator.innerText = "File loading aborted";
+  };
+
+  console.log("Starting readAsArrayBuffer...");
   reader.readAsArrayBuffer(file);
+  console.log("readAsArrayBuffer called (this doesn't mean loading is complete)");
 }
 
 function computePeaks(buffer) {
@@ -165,7 +209,7 @@ function computePeaks(buffer) {
 
   const samplesPerChunk = Math.floor(data.length / numberOfPeaks);
   for (let i = 0; i < data.length; i += samplesPerChunk) {
-    title.innerText = `Computing peaks: ${i} / ${data.length}`
+    //title.innerText = `Computing peaks: ${i} / ${data.length}`
     const slice = data.slice(i, i + samplesPerChunk);
     const peak = Math.max(...slice.map(Math.abs));
     const time = i / sampleRate;
@@ -193,14 +237,13 @@ function markSilentRegions() {
   let silent = false;
   let currentRegion = null;
   silentRegions = [];
-
   for (let i = 0; i < precomputedPeaks.length; i++) {
-    title.innerText = `Marking silent regions: ${i} / ${precomputedPeaks.length}`
+    //title.innerText = `Marking silent regions: ${i} / ${precomputedPeaks.length}`
     const peakData = precomputedPeaks[i];
     const max = peakData.peak;
     const time = peakData.time;
 
-    if (max < threshold) {
+    if (max <= threshold) {
       if (!silent) {
         currentRegion = { start: time };
         silent = true;
@@ -256,8 +299,9 @@ function applyShrinkFilter(shrinkMs) {
 
 function drawRegions() {
   if (!wavesurfer) return;
+  title.innerText = "for each 2"
   Object.values(wavesurfer.regions.list).forEach(region => region.remove());
-  
+  title.innerText = "for each 3"
   silentRegions.forEach(region => {
     wavesurfer.addRegion({
       start: region.start,
@@ -267,6 +311,7 @@ function drawRegions() {
       resize: false
     });
   });
+  title.innerText = "Tweak the sliders!"
 }
 
 function updateStats() {
@@ -278,51 +323,118 @@ function updateStats() {
   const timeSaved = totalSilence.toFixed(2);
   const percentSaved = (originalDuration ? (timeSaved / originalDuration * 100) : 0).toFixed(1);
   statsPanel.innerText = `Time saved: ${timeSaved}s - ${percentSaved}% shorter - ${silentRegions.length} silence regions`;
+  if (silentRegions.length > 120) {
+    title.innerText = `${silentRegions.length} silence regions is too many. Max: 120. Tweak the sliders!`
+  }
+  else {
+    title.innerText = "Silent parts in red will be removed - adjust carefully"
+  }
 }
 
-function cutAudio() {
+async function cutAudio() {
   if (!audioBuffer) return;
 
+  // 1. Initial setup
+  title.innerText = "Preparing...";
+  await new Promise(r => setTimeout(r, 10));
+
+  // 2. Process regions with progress
+  title.innerText = "Processing regions (0%)...";
+  const channelData = audioBuffer.getChannelData(0);
   const sampleRate = audioBuffer.sampleRate;
-  const output = [];
+  let outputChunks = [];
   let lastEnd = 0;
 
-  silentRegions.forEach(region => {
+  for (let i = 0; i < silentRegions.length; i++) {
+    const region = silentRegions[i];
     const startSample = Math.floor(lastEnd * sampleRate);
     const endSample = Math.floor(region.start * sampleRate);
+    
     if (endSample > startSample) {
-      output.push(audioBuffer.getChannelData(0).slice(startSample, endSample));
+      outputChunks.push(channelData.slice(startSample, endSample));
     }
     lastEnd = region.end;
-  });
 
+    // Update progress every few regions
+    if (i % 3 === 0) {
+      const percent = Math.floor((i / silentRegions.length) * 100);
+      title.innerText = `Processing regions (${percent}%)...`;
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+
+  // 3. Final segment
+  await new Promise(r => setTimeout(r, 10));
   const startSample = Math.floor(lastEnd * sampleRate);
   const endSample = audioBuffer.length;
   if (endSample > startSample) {
-    output.push(audioBuffer.getChannelData(0).slice(startSample, endSample));
+    outputChunks.push(channelData.slice(startSample, endSample));
   }
 
-  const totalLength = output.reduce((acc, arr) => acc + arr.length, 0);
-  const combined = new Float32Array(totalLength);
-  let offset = 0;
-  output.forEach(arr => {
-    combined.set(arr, offset);
-    offset += arr.length;
-  });
-
+  // 4. Create buffer in smaller chunks to prevent freezing
   const ctx = new AudioContext();
-  const newBuffer = ctx.createBuffer(1, combined.length, sampleRate);
-  newBuffer.copyToChannel(combined, 0);
-
-  if (outputFormat === 'mp3') {
-    lastBlob = encodeMP3(newBuffer);
-    audioPreview.src = URL.createObjectURL(lastBlob);
-  } else {
-    encodeWAV(newBuffer).then(blob => {
-      lastBlob = blob;
-      audioPreview.src = URL.createObjectURL(blob);
-    });
+  const totalLength = outputChunks.reduce((sum, arr) => sum + arr.length, 0);
+  const newBuffer = ctx.createBuffer(1, totalLength, sampleRate);
+  const outputChannel = newBuffer.getChannelData(0);
+  
+  let writePosition = 0;
+  const CHUNK_SIZE = 100000; // Process 100k samples at a time
+  
+  for (const chunk of outputChunks) {
+    for (let i = 0; i < chunk.length; i += CHUNK_SIZE) {
+      const end = Math.min(i + CHUNK_SIZE, chunk.length);
+      outputChannel.set(chunk.subarray(i, end), writePosition + i);
+      
+      // Update progress periodically
+      if (i % (CHUNK_SIZE * 10) === 0) {
+        const percent = Math.floor(((writePosition + i) / totalLength) * 100);
+        await new Promise(r => setTimeout(r, 0));
+        title.innerText = `Creating buffer (${percent}%)...`;
+      }
+    }
+    writePosition += chunk.length;
   }
+
+  title.innerText = "Encoding... (Takes a few seconds)";
+  await new Promise(r => setTimeout(r, 10)); // Ensure UI renders
+  
+  try {
+    lastBlob = outputFormat === 'mp3' 
+      ? await encodeMP3Async(newBuffer) // Modified to be async
+      : await encodeWAVAsync(newBuffer); // Modified to be async
+    
+    audioPreview.src = URL.createObjectURL(lastBlob);
+    title.innerText = "Done! Consider donating ❤";
+    audioTitle.style.display = 'block';
+    audioPreview.style.display = 'inline-block';
+    downloadBtn.style.display = 'inline-block';
+    setTimeout(() => {
+      scrollToBottomWithDelay();
+    }, 500);
+    
+  } catch (err) {
+    title.innerText = "Encoding failed";
+    console.error(err);
+  }
+}
+
+// Modified encoder functions
+function encodeMP3Async(buffer) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      const result = encodeMP3(buffer);
+      resolve(result);
+    }, 0);
+  });
+}
+
+function encodeWAVAsync(buffer) {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      const result = encodeWAV(buffer);
+      resolve(result);
+    }, 0);
+  });
 }
 
 function encodeWAV(buffer) {
@@ -358,11 +470,9 @@ function encodeWAV(buffer) {
     view.setUint16(pos, 16, true); pos += 2;
     writeString('data');
     view.setUint32(pos, length - pos - 4, true); pos += 4;
-
     for (let i = 0; i < buffer.numberOfChannels; i++) {
       channels.push(buffer.getChannelData(i));
     }
-
     for (let i = 0; i < buffer.length; i++) {
       for (let channel = 0; channel < numOfChan; channel++) {
         write16bitSample(channels[channel][i]);
@@ -378,10 +488,13 @@ function encodeMP3(buffer) {
   const mp3enc = new lamejs.Mp3Encoder(1, buffer.sampleRate, 128);
   const blockSize = 1152;
   const data = [];
-
+  
   function floatTo16BitPCM(input) {
     const output = new Int16Array(input.length);
     for (let i = 0; i < input.length; i++) {
+      //if (i % 10 == 1) {
+        //title.innerText = `${i}`}
+      
       output[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
     }
     return output;
@@ -403,40 +516,12 @@ function encodeMP3(buffer) {
   return new Blob(data, { type: 'audio/mp3' });
 }
 
-function displayVideoAndDownload(url, filename) {
-  // Remove existing preview and download link if any
-  const existingPreview = document.getElementById('videoPreview');
-  if (existingPreview) existingPreview.remove();
-
-  const existingDownload = document.getElementById('videoDownloadLink');
-  if (existingDownload) existingDownload.remove();
-
-  // Display video preview
-  const videoPreview = document.createElement('video');
-  videoPreview.id = 'videoPreview';
-  videoPreview.src = url;
-  videoPreview.controls = true;
-  videoPreview.style.marginTop = '10px';
-  videoPreview.style.maxWidth = '100%';
-  document.body.appendChild(videoPreview);
-
-  // Display download link
-  const downloadLink = document.createElement('a');
-  downloadLink.id = 'videoDownloadLink';
-  downloadLink.href = url;
-  downloadLink.download = filename;
-  downloadLink.innerText = '⬇ Download Video';
-  downloadLink.style.display = 'block';
-  downloadLink.style.marginTop = '10px';
-  downloadLink.style.fontSize = '18px';
-  document.body.appendChild(downloadLink);
-}
-
 function calculateNonSilentRanges() {
   const originalDuration = audioBuffer ? audioBuffer.duration : 0;
   let regions = [];
 
   let lastEnd = 0;
+  title.innerText = "Getting ready..."
   silentRegions.forEach(region => {
     if (region.start > lastEnd) {
       regions.push({ start: lastEnd, end: region.start });
@@ -486,6 +571,7 @@ async function cutVideo() {
   console.log("Starting to cut non-silent segments...");
 
   try {
+    title.innerText = `Cutting your video. Consider donating ❤`
     for (let i = 0; i < nonSilentRegions.length; i++) {
       const region = nonSilentRegions[i];
       const outputName = `part${i}.mp4`;
@@ -536,18 +622,25 @@ async function cutVideo() {
       const filesAfterReadBack = await ffmpeg.listDir('/');
       console.log(`Filesystem after reading back segment ${outputName}:`, filesAfterReadBack);
     }
-    console.log("Finished cutting all non-silent segments. Generated filenames:", segmentFileNames);
   } catch (err) {
     console.error("Failed to cut segments:", err);
     alert("Segment cutting failed. Check the console.");
     return;
   }
 
-  processingIndicator.innerText = 'Concatenating segments...';
+  title.innerText = 'Concatenating segments...';
   console.log("Calling concatSegments with filenames:", segmentFileNames);
 
   try {
     await concatSegments(segmentFileNames);
+    title.innerText = `Success. Consider donating ❤`
+    vidTitle.style.display = 'block';
+    videoPreview.style.display = 'inline-block';
+    downloadVideoBtn.style.display = 'inline-block';
+    setTimeout(() => {
+      scrollToBottomWithDelay();
+    }, 500);
+    
     console.log("Concatenation completed successfully.");
   } catch (err) {
     console.error("Concat failed:", err);
@@ -563,8 +656,7 @@ async function cutVideo() {
     const url = URL.createObjectURL(blob);
 
     videoPreview.src = url;
-    videoPreview.style.display = 'block';
-    downloadVideoBtn.style.display = 'inline-block';
+
     downloadVideoBtn.onclick = () => {
       const a = document.createElement('a');
       a.href = url;
@@ -580,42 +672,76 @@ async function cutVideo() {
 
 async function concatSegments(fileNames) {
   console.log("--- START concatSegments (Corrected) ---");
-  console.log("Input filenames:", fileNames);
+  
+  // Create progress tracking
+  let progress = 0;
+  const totalSteps = fileNames.length + 3; // Each file + init + finalize
+  const updateProgress = () => {
+    const percent = Math.round((progress / totalSteps) * 100);
+    title.innerText = `Processing ${percent}% (${progress}/${totalSteps})`;
+  };
 
   try {
-    // Generate list.txt content
-    const listContent = fileNames.map(name => `file '${name}'`).join('\n');
-    
-    // Write list.txt to FFmpeg filesystem
-    console.log("Writing list.txt to FFmpeg FS");
-    await ffmpeg.writeFile('list.txt', listContent);
-    console.log("list.txt written successfully");
+    // Step 1: Prepare list
+    progress++;
+    updateProgress();
+    await ffmpeg.writeFile('list.txt', fileNames.map(name => `file '${name}'`).join('\n'));
 
-    // FFmpeg arguments for concat demuxer
+    // Step 2: Process each file (simulated progress)
+    for (const [index, fileName] of fileNames.entries()) {
+      progress++;
+      updateProgress();
+      
+      // Fake delay to show progress (remove in production)
+      await new Promise(r => setTimeout(r, 100)); 
+    }
+
+    // Step 3: Final concatenation
     const ffmpegArgs = [
-      '-f', 'concat',      // Use concat demuxer
-      '-safe', '0',        // Allow "unsafe" filenames
-      '-i', 'list.txt',    // Input list file
-      '-c', 'copy',        // Stream copy (no re-encode)
+      '-f', 'concat',
+      '-safe', '0',
+      '-i', 'list.txt',
+      '-c', 'copy',
       'final.mp4'
     ];
 
-    console.log("Executing ffmpeg with concat demuxer:", ffmpegArgs);
+    progress++;
+    updateProgress();
     await ffmpeg.exec(ffmpegArgs);
 
-    // Verify output exists
-    const filesAfterConcat = await ffmpeg.listDir('/');
-    if (!filesAfterConcat.some(entry => entry.name === 'final.mp4')) {
-      throw new Error("final.mp4 not created");
+    // Verify output
+    if (!(await ffmpeg.listDir('/')).some(f => f.name === 'final.mp4')) {
+      throw new Error("Output file missing");
     }
 
-    console.log("Concatenation successful! final.mp4 created");
-    console.log("--- END concatSegments (Corrected) ---");
+    progress = totalSteps;
+    updateProgress();
     
   } catch (err) {
-    console.error("Concat failed:", err);
-    console.log("Filesystem state after failure:", await ffmpeg.listDir('/'));
-    throw new Error(`Concatenation failed: ${err.message}`);
+    title.innerText = "Error during concatenation";
+    throw err;
   }
 }
 
+
+
+
+function scrollToBottomWithDelay(duration = 2000) {
+  const start = window.scrollY;
+  const end = document.documentElement.scrollHeight - window.innerHeight;
+  const distance = end - start;
+  const startTime = performance.now();
+
+  function step(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1); // cap at 1
+    const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+    window.scrollTo(0, start + distance * ease);
+
+    if (progress < 1) {
+      requestAnimationFrame(step);
+    }
+  }
+
+  requestAnimationFrame(step);
+}
