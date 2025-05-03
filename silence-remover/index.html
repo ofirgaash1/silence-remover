@@ -20,7 +20,12 @@
 <!-- Waveform Container -->
 <div id="waveformContainer" style="position: relative;">
   <div id="waveform" class="waveform" style="display:none;"></div>
+  <div id="thresholdLine"></div>
 </div>
+
+<label class="zoom">
+  Zoom: <input type="range" id="zoomSlider" min="0" max="50" value="0"/>
+</label>
 
 <!-- Sliders and Controls -->
 <div class="controls">
@@ -36,7 +41,7 @@
   <div class="control-group">
     <label for="shrinkSlider">Shrink Silence:</label>
     <div class="slider-row">
-      <input type="range" id="shrinkSlider" min="0" max="1000" step="1">
+      <input type="range" id="shrinkSlider" min="0" value="0" max="1000" step="1">
       <input type="number" id="shrinkInput" step="1">ms
     </div>
   </div>
@@ -67,7 +72,7 @@
   <img alt="" border="0" src="https://www.paypal.com/en_IL/i/scr/pixel.gif" width="1" height="1" />
   </form>
 <!-- Audio Preview -->
-<h3 id="audioTitle">Audio Preview:</h3>
+
 <audio id="audioPreview" controls></audio>
 <br>
 <button id="AudioDownloadBtn" class="download-btn">Download Audio</button>
@@ -81,13 +86,11 @@
 <!-- Processing Indicator -->
 <div id="processingIndicator" style="display:none;">Processing, please wait...</div>
 
-
-
 <!-- Script dependencies -->
 <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
 <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
 <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
-<script type="module" src="/src/entry.js"></script>
+<script type="module" src="./src/script.js"></script>
 
 </body>
 </html>

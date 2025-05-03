@@ -1,4 +1,23 @@
+import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/classes.js';
 
+window.FFmpegLib = {
+  createFFmpeg: (options) => new FFmpeg(options),
+  fetchFile: async (file) => {
+    const buffer = await file.arrayBuffer();
+    return new Uint8Array(buffer);
+  }
+};
+
+// ✅ wait until global libs are defined, then call main()
+
+const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+async function runDelayedMain() {
+  await delay(0); // Wait for the next event loop tick (effectively asynchronous)
+  await main();
+}
+
+runDelayedMain()
 
 let wavesurfer = null;
 let audioBuffer = null;
@@ -7,26 +26,24 @@ let lastBlob = null;
 let outputFormat = 'mp3';
 let precomputedPeaks = [];
 let uploadedFile = null;
-
+let tweak = false;
 let ffmpeg;
 let fetchFile;
 let ffmpegLoaded = false;
 
 export async function main() {
   const { createFFmpeg, fetchFile: ffetch } = window.FFmpegLib;
-  ffmpeg = createFFmpeg({ log: true });  
+  ffmpeg = createFFmpeg({ log: true });
   fetchFile = ffetch;
 
   setupUIEvents();
 
-  
 }
 const title = document.getElementById('title');
 const dropZone = document.getElementById('drop-zone');
 const waveformDiv = document.getElementById('waveform');
 const browseBtn = document.getElementById('drop-zone');
 const fileInput = document.getElementById('audioFile');
-const thresholdSlider = document.getElementById('thresholdSlider');
 const thresholdInput = document.getElementById('thresholdInput');
 const shrinkSlider = document.getElementById('shrinkSlider');
 const shrinkInput = document.getElementById('shrinkInput');
@@ -38,15 +55,46 @@ const cutVideoBtn = document.getElementById('cutVideoBtn');
 const downloadVideoBtn = document.getElementById('downloadVideoBtn');
 const statsPanel = document.getElementById('statsPanel');
 const vidTitle = document.getElementById('vidTitle');
-const audioTitle = document.getElementById('audioTitle');
+const zoomSlider = document.getElementById('zoomSlider');
+const thresholdSlider = document.getElementById('thresholdSlider');
+const thresholdLine = document.getElementById('thresholdLine');
+const waveform = document.getElementById('waveform');
+
+
+let isDown = false;
+let startX, startScroll;
+
+
+
+thresholdSlider.addEventListener('input', updateThresholdLine);
+
+function updateThresholdLine() {
+  const raw = parseFloat(thresholdSlider.value) / 100;
+  const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
+  const threshold = mapped * mapped;
+
+  const waveformHeight = waveform.offsetHeight;
+  const centerY = waveformHeight / 2;
+  const yPos = centerY * (1 - threshold); // line from center (0) to top (1)
+
+  thresholdLine.style.top = `${yPos}px`;
+}
+
+
+zoomSlider.addEventListener('input', (e) => {
+  const minPxPerSec = e.target.valueAsNumber;
+  if (wavesurfer) {
+    wavesurfer.zoom(minPxPerSec);
+  }
+});
+
 
 function setupUIEvents() {
   downloadVideoBtn.style.display = 'none';
   vidTitle.style.display = 'none';
-  audioTitle.style.display = 'none';
   audioPreview.style.display = 'none';
   downloadBtn.style.display = 'none';
-  
+
   browseBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
 
@@ -105,9 +153,11 @@ function setupUIEvents() {
 }
 
 function normalizeAudioBuffer(buffer) {
-  
+
   const data = buffer.getChannelData(0);
   let max = 0;
+  console.log(data.length);
+
   for (let i = 0; i < data.length; i++) {
     const abs = Math.abs(data[i]);
     if (abs > max) max = abs;
@@ -118,6 +168,8 @@ function normalizeAudioBuffer(buffer) {
     data[i] *= multiplier;
   }
 }
+
+
 
 function handleFile(file) {
   if (!file) return;
@@ -135,16 +187,49 @@ function handleFile(file) {
   dropZone.style.display = 'none';
   waveformDiv.style.display = 'block';
 
+
+  updateThresholdLine(); // Ensure line is placed immediately
+
   wavesurfer = WaveSurfer.create({
+    height: 128,
+    scrollParent: false,
     container: waveformDiv,
     waveColor: 'blue',
     progressColor: 'blue',
     backend: 'WebAudio',
+    responsive: true,
     plugins: [WaveSurfer.regions.create({})]
   });
 
+  const wave = document.querySelector('#waveform wave');
+  // when mouse goes down, start the “pan”
+wave.addEventListener('mousedown', e => {
+  isDown     = true;
+  startX     = e.pageX - wave.offsetLeft;
+  startScroll= wave.scrollLeft;
+  wave.classList.add('dragging');
+  e.preventDefault();  // prevent text selection
+});
+
+// as you move, shift scrollLeft
+wave.addEventListener('mousemove', e => {
+  if (!isDown) return;
+  const x = e.pageX - wave.offsetLeft;
+  const delta = x - startX;
+  wave.scrollLeft = startScroll - delta;
+});
+
+// on release/leave, stop panning
+['mouseup','mouseleave'].forEach(evt =>
+  wave.addEventListener(evt, () => {
+    isDown = false;
+    wave.classList.remove('dragging');
+  })
+);
+
+
   const reader = new FileReader();
-  
+
   // Add progress event listener
   reader.onprogress = (e) => {
     if (e.lengthComputable) {
@@ -159,9 +244,10 @@ function handleFile(file) {
     console.log("File reading started");
     title.innerText = "Starting file load...";
   };
-title.innerText = "test2"
+  title.innerText = "test2"
   reader.onload = async e => {
     console.log("File fully loaded into memory");
+    title.innerText = "Tweak the sliders!"
     try {
       const arrayBuffer = e.target.result;
       const ctx = new AudioContext();
@@ -170,30 +256,28 @@ title.innerText = "test2"
       title.innerText = "Audio decoded, normalizing...";
       normalizeAudioBuffer(audioBuffer);
       precomputedPeaks = computePeaks(audioBuffer);
-      
+
       console.log("Processing regions...");
       handleThresholdChange();
       drawRegions();
-      
+
       console.log("Loading waveform...");
       wavesurfer.loadDecodedBuffer(audioBuffer);
-      
-      processingIndicator.innerText = "";
+
       console.log("File processing complete");
     } catch (err) {
       console.error("Processing error:", err);
-      processingIndicator.innerText = "Error processing file";
+      title.innerText = `Processing error: ${err}. Try to play your file first. Maybe it doesn't have audio.`
+
     }
   };
 
   reader.onerror = () => {
     console.error("FileReader error:", reader.error);
-    processingIndicator.innerText = "File loading failed";
   };
 
   reader.onabort = () => {
     console.warn("File reading aborted");
-    processingIndicator.innerText = "File loading aborted";
   };
 
   console.log("Starting readAsArrayBuffer...");
@@ -205,7 +289,7 @@ function computePeaks(buffer) {
   const data = buffer.getChannelData(0);
   const sampleRate = buffer.sampleRate;
   const peaks = [];
-  const numberOfPeaks = 8000;
+  const numberOfPeaks = 20000;
 
   const samplesPerChunk = Math.floor(data.length / numberOfPeaks);
   for (let i = 0; i < data.length; i += samplesPerChunk) {
@@ -265,32 +349,33 @@ function markSilentRegions() {
       silentRegions.push(currentRegion);
     }
   }
-
+  thresholdLine.style.display = 'block';
+  title.innerText = "Silent parts in red will be removed - Tweak the sliders carefully :)"
   applyShrinkFilter(shrinkMs);
   drawRegions();
   updateStats();
-  
+
 }
 
 function applyShrinkFilter(shrinkMs) {
   const shrink = shrinkMs / 1000;
   const duration = audioBuffer ? audioBuffer.duration : 0;
-  
+
   silentRegions = silentRegions
     .map(region => {
       let start = region.start;
       let end = region.end;
-      
+
       // Only shrink start if it's not at 0
       if (region.start > 0) {
         start = region.start + shrink;
       }
-      
+
       // Only shrink end if it's not at duration
       if (region.end < duration) {
         end = region.end - shrink;
       }
-      
+
       // Return null if invalid region after shrinking
       return start < end ? { start, end } : null;
     })
@@ -298,10 +383,10 @@ function applyShrinkFilter(shrinkMs) {
 }
 
 function drawRegions() {
+  
   if (!wavesurfer) return;
-  title.innerText = "for each 2"
   Object.values(wavesurfer.regions.list).forEach(region => region.remove());
-  title.innerText = "for each 3"
+
   silentRegions.forEach(region => {
     wavesurfer.addRegion({
       start: region.start,
@@ -311,7 +396,6 @@ function drawRegions() {
       resize: false
     });
   });
-  title.innerText = "Tweak the sliders!"
 }
 
 function updateStats() {
@@ -323,12 +407,6 @@ function updateStats() {
   const timeSaved = totalSilence.toFixed(2);
   const percentSaved = (originalDuration ? (timeSaved / originalDuration * 100) : 0).toFixed(1);
   statsPanel.innerText = `Time saved: ${timeSaved}s - ${percentSaved}% shorter - ${silentRegions.length} silence regions`;
-  if (silentRegions.length > 120) {
-    title.innerText = `${silentRegions.length} silence regions is too many. Max: 120. Tweak the sliders!`
-  }
-  else {
-    title.innerText = "Silent parts in red will be removed - adjust carefully"
-  }
 }
 
 async function cutAudio() {
@@ -349,7 +427,7 @@ async function cutAudio() {
     const region = silentRegions[i];
     const startSample = Math.floor(lastEnd * sampleRate);
     const endSample = Math.floor(region.start * sampleRate);
-    
+
     if (endSample > startSample) {
       outputChunks.push(channelData.slice(startSample, endSample));
     }
@@ -376,15 +454,15 @@ async function cutAudio() {
   const totalLength = outputChunks.reduce((sum, arr) => sum + arr.length, 0);
   const newBuffer = ctx.createBuffer(1, totalLength, sampleRate);
   const outputChannel = newBuffer.getChannelData(0);
-  
+
   let writePosition = 0;
   const CHUNK_SIZE = 100000; // Process 100k samples at a time
-  
+
   for (const chunk of outputChunks) {
     for (let i = 0; i < chunk.length; i += CHUNK_SIZE) {
       const end = Math.min(i + CHUNK_SIZE, chunk.length);
       outputChannel.set(chunk.subarray(i, end), writePosition + i);
-      
+
       // Update progress periodically
       if (i % (CHUNK_SIZE * 10) === 0) {
         const percent = Math.floor(((writePosition + i) / totalLength) * 100);
@@ -397,21 +475,19 @@ async function cutAudio() {
 
   title.innerText = "Encoding... (Takes a few seconds)";
   await new Promise(r => setTimeout(r, 10)); // Ensure UI renders
-  
+
   try {
-    lastBlob = outputFormat === 'mp3' 
+    lastBlob = outputFormat === 'mp3'
       ? await encodeMP3Async(newBuffer) // Modified to be async
       : await encodeWAVAsync(newBuffer); // Modified to be async
-    
+
     audioPreview.src = URL.createObjectURL(lastBlob);
     title.innerText = "Done! Consider donating ❤";
-    audioTitle.style.display = 'block';
     audioPreview.style.display = 'inline-block';
     downloadBtn.style.display = 'inline-block';
-    setTimeout(() => {
-      scrollToBottomWithDelay();
-    }, 500);
-    
+    scrollToBottomWithDelay()
+
+
   } catch (err) {
     title.innerText = "Encoding failed";
     console.error(err);
@@ -488,13 +564,13 @@ function encodeMP3(buffer) {
   const mp3enc = new lamejs.Mp3Encoder(1, buffer.sampleRate, 128);
   const blockSize = 1152;
   const data = [];
-  
+
   function floatTo16BitPCM(input) {
     const output = new Int16Array(input.length);
     for (let i = 0; i < input.length; i++) {
       //if (i % 10 == 1) {
-        //title.innerText = `${i}`}
-      
+      //title.innerText = `${i}`}
+
       output[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
     }
     return output;
@@ -514,6 +590,7 @@ function encodeMP3(buffer) {
   }
 
   return new Blob(data, { type: 'audio/mp3' });
+
 }
 
 function calculateNonSilentRanges() {
@@ -543,40 +620,48 @@ async function cutVideo() {
   }
 
   const nonSilentRegions = calculateNonSilentRanges();
-  console.log("Calculadted non-silent regions:", nonSilentRegions);
+  console.log("Calculated non-silent regions:", nonSilentRegions);
 
   if (nonSilentRegions.length === 0) {
     alert("No silence detected — full video kept!");
     return;
   }
 
-  if (!ffmpegLoaded) {
-    console.log("FFmpeg not loaded, loading now...");
+  const BATCH_SIZE = 30;
+  let batchIndex = 0;
+  const fullOutputBuffers = [];
+
+  async function initFFmpeg() {
+    const { createFFmpeg, fetchFile: ffetch } = window.FFmpegLib;
+    ffmpeg = createFFmpeg({ log: true });
     await ffmpeg.load({
       classWorkerURL: new URL('/worker/worker.mjs', window.location.origin).href,
       workerOptions: { type: 'module' }
     });
     ffmpegLoaded = true;
-    console.log("FFmpeg loaded successfully.");
-  } else {
-    console.log("FFmpeg already loaded.");
   }
 
-  console.log("Writing input file to ffmpeg filesystem: input.mp4");
-  await ffmpeg.writeFile('input.mp4', await fetchFile(uploadedFile));
-  console.log("Input file written successfully.");
+  if (!ffmpegLoaded) {
+    console.log("Loading FFmpeg...");
+    await initFFmpeg();
+  }
 
-  const segmentFileNames = [];
-  processingIndicator.innerText = 'Cutting non-silent segments...';
-  console.log("Starting to cut non-silent segments...");
+  let totalParts = nonSilentRegions.length
+  for (let batchStart = 0; batchStart < nonSilentRegions.length; batchStart += BATCH_SIZE) {
+    const batchRegions = nonSilentRegions.slice(batchStart, batchStart + BATCH_SIZE);
+    const segmentFileNames = [];
+    console.log(`--- Processing batch ${batchIndex + 1} ---`);
 
-  try {
-    title.innerText = `Cutting your video. Consider donating ❤`
-    for (let i = 0; i < nonSilentRegions.length; i++) {
-      const region = nonSilentRegions[i];
-      const outputName = `part${i}.mp4`;
+    // Write input file again (after first batch or restart)
+    await ffmpeg.writeFile('input.mp4', await fetchFile(uploadedFile));
+
+    for (let i = 0; i < batchRegions.length; i++) {
+      const region = batchRegions[i];
+      const segmentIndex = batchStart + i;
+      const outputName = `part${segmentIndex}.mp4`;
       segmentFileNames.push(outputName);
 
+      title.innerText = `Encoding part ${segmentIndex + 1} of ${totalParts}...`
       wavesurfer.addRegion({
         start: region.start,
         end: region.end,
@@ -584,149 +669,134 @@ async function cutVideo() {
         drag: false,
         resize: false
       });
-      
+
       const args = [
         '-ss', region.start.toFixed(6),
         '-i', 'input.mp4',
         '-to', (region.end - region.start).toFixed(6),
-        // VIDEO
-        '-c:v', 'libx264',          // Standard YouTube codec
-        '-crf', '20',               // Sweet spot for YouTube-like quality
-        '-preset', 'ultrafast',        // No size compression - around 2.5 larger files than input
-        '-profile:v', 'high',       // YouTube-compatible profile
-        '-pix_fmt', 'yuv420p',      // Standard YouTube pixel format
-        '-movflags', '+faststart',  // Enable streaming
-        // AUDIO
-        '-c:a', 'aac',              // YouTube's audio codec
-        '-b:a', '128k',             // YouTube-standard bitrate
-        // PERFORMANCE
-        '-threads', '0',            // Use all CPU cores
+        '-c:v', 'libx264',
+        '-crf', '20',
+        '-preset', 'ultrafast',
+        '-profile:v', 'high',
+        '-pix_fmt', 'yuv420p',
+        '-movflags', '+faststart',
+        '-c:a', 'aac',
+        '-b:a', '128k',
+        '-threads', '0',
         '-avoid_negative_ts', '1',
         outputName
       ];
-      
-      console.log(`Executing ffmpeg for segment ${i}:`, args);
+
       await ffmpeg.exec(args);
-      console.log(`Segment ${i} (${outputName}) created successfully.`);
-      const filesAfterCut = await ffmpeg.listDir('/');
-      console.log(`Files in ffmpeg filesystem after cutting segment ${i}:`, filesAfterCut);
-
-      // Attempt to read the file immediately after writing
-      console.log(`Attempting to read back segment ${outputName} immediately after writing...`);
-      try {
-        const data = await ffmpeg.readFile(outputName);
-        console.log(`Successfully read back segment ${outputName}. Size: ${data.length}`);
-      } catch (readErr) {
-        console.error(`Error reading back segment ${outputName}:`, readErr);
-      }
-      const filesAfterReadBack = await ffmpeg.listDir('/');
-      console.log(`Filesystem after reading back segment ${outputName}:`, filesAfterReadBack);
     }
-  } catch (err) {
-    console.error("Failed to cut segments:", err);
-    alert("Segment cutting failed. Check the console.");
-    return;
+
+    // Concatenate this batch
+    const batchOutputName = `final_batch_${batchIndex}.mp4`;
+    await concatSegments(segmentFileNames, batchOutputName);
+
+    // Read result to memory
+    const batchData = await ffmpeg.readFile(batchOutputName);
+    fullOutputBuffers.push(batchData);
+
+    // Reset FFmpeg instance
+
+    ffmpegLoaded = false;
+
+    ffmpeg = null;
+    console.log("FFmpeg exited after batch", batchIndex + 1);
+
+    await initFFmpeg();
+    batchIndex++;
   }
 
-  title.innerText = 'Concatenating segments...';
-  console.log("Calling concatSegments with filenames:", segmentFileNames);
+  // Save the buffers for further use (merge all batches, etc.)
+  window.processedBatches = fullOutputBuffers;
 
-  try {
-    await concatSegments(segmentFileNames);
-    title.innerText = `Success. Consider donating ❤`
-    vidTitle.style.display = 'block';
-    videoPreview.style.display = 'inline-block';
-    downloadVideoBtn.style.display = 'inline-block';
-    setTimeout(() => {
-      scrollToBottomWithDelay();
-    }, 500);
-    
-    console.log("Concatenation completed successfully.");
-  } catch (err) {
-    console.error("Concat failed:", err);
-    alert("Concatenation failed. Check the console.");
-    return;
-  }
-
-  // Load final video
-  try {
-    console.log("Reading final.mp4 from ffmpeg filesystem...");
-    const data = await ffmpeg.readFile('final.mp4');
-    const blob = new Blob([data.buffer], { type: 'video/mp4' });
-    const url = URL.createObjectURL(blob);
-
-    videoPreview.src = url;
-
-    downloadVideoBtn.onclick = () => {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'final.mp4';
-      a.click();
-    };
-    console.log("Final video loaded and URL created.");
-  } catch (err) {
-    console.error("Failed to load final video:", err);
-    alert("Could not load final output. Check console.");
-  }
+  await mergeAllBatches();
 }
 
-async function concatSegments(fileNames) {
-  console.log("--- START concatSegments (Corrected) ---");
-  
-  // Create progress tracking
-  let progress = 0;
-  const totalSteps = fileNames.length + 3; // Each file + init + finalize
-  const updateProgress = () => {
-    const percent = Math.round((progress / totalSteps) * 100);
-    title.innerText = `Processing ${percent}% (${progress}/${totalSteps})`;
+async function mergeAllBatches() {
+  if (!window.processedBatches || window.processedBatches.length === 0) {
+    alert("No batches to merge. Run cutVideo() first.");
+    return;
+  }
+
+  console.log("Merging all processed batches...");
+
+  // Initialize FFmpeg
+  const { createFFmpeg } = window.FFmpegLib;
+  const ffmpegMerge = createFFmpeg({ log: true });
+  await ffmpegMerge.load({
+    classWorkerURL: new URL('/worker/worker.mjs', window.location.origin).href,
+    workerOptions: { type: 'module' }
+  });
+
+  // Write all batch files and create list.txt
+  const listLines = [];
+  for (let i = 0; i < window.processedBatches.length; i++) {
+    const filename = `final_batch_${i}.mp4`;
+    await ffmpegMerge.writeFile(filename, window.processedBatches[i]);
+    listLines.push(`file '${filename}'`);
+  }
+
+  await ffmpegMerge.writeFile('list.txt', listLines.join('\n'));
+
+  // Concatenate batches
+  const args = [
+    '-f', 'concat',
+    '-safe', '0',
+    '-i', 'list.txt',
+    '-c', 'copy',
+    'final_merged.mp4'
+  ];
+
+  await ffmpegMerge.exec(args);
+
+  // Read final merged output
+  const finalData = await ffmpegMerge.readFile('final_merged.mp4');
+  const blob = new Blob([finalData.buffer], { type: 'video/mp4' });
+  const url = URL.createObjectURL(blob);
+
+  // Display or download
+  const videoPreview = document.querySelector('#videoPreview');
+  const downloadButton = document.querySelector('#downloadVideoBtn');
+  title.innerText = "Done! Consider donating ❤";
+
+  videoPreview.src = url;
+  videoPreview.style.display = 'inline-block';
+  downloadButton.style.display = 'inline-block';
+  downloadButton.onclick = () => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'final_merged.mp4';
+    a.click();
   };
-
-  try {
-    // Step 1: Prepare list
-    progress++;
-    updateProgress();
-    await ffmpeg.writeFile('list.txt', fileNames.map(name => `file '${name}'`).join('\n'));
-
-    // Step 2: Process each file (simulated progress)
-    for (const [index, fileName] of fileNames.entries()) {
-      progress++;
-      updateProgress();
-      
-      // Fake delay to show progress (remove in production)
-      await new Promise(r => setTimeout(r, 100)); 
-    }
-
-    // Step 3: Final concatenation
-    const ffmpegArgs = [
-      '-f', 'concat',
-      '-safe', '0',
-      '-i', 'list.txt',
-      '-c', 'copy',
-      'final.mp4'
-    ];
-
-    progress++;
-    updateProgress();
-    await ffmpeg.exec(ffmpegArgs);
-
-    // Verify output
-    if (!(await ffmpeg.listDir('/')).some(f => f.name === 'final.mp4')) {
-      throw new Error("Output file missing");
-    }
-
-    progress = totalSteps;
-    updateProgress();
-    
-  } catch (err) {
-    title.innerText = "Error during concatenation";
-    throw err;
-  }
+  scrollToBottomWithDelay()
+  console.log("Final video merged and loaded.");
 }
 
 
+async function concatSegments(fileNames, outputFileName = 'final.mp4') {
+  await ffmpeg.writeFile('list.txt', fileNames.map(name => `file '${name}'`).join('\n'));
 
+  const ffmpegArgs = [
+    '-f', 'concat',
+    '-safe', '0',
+    '-i', 'list.txt',
+    '-c', 'copy',
+    outputFileName
+  ];
 
-function scrollToBottomWithDelay(duration = 2000) {
+  await ffmpeg.exec(ffmpegArgs);
+}
+
+async function scrollToBottomWithDelay(duration = 2000) {
+  setTimeout(() => {
+    scroll(duration);
+  }, 1000);
+}
+
+function scroll(duration) {
   const start = window.scrollY;
   const end = document.documentElement.scrollHeight - window.innerHeight;
   const distance = end - start;

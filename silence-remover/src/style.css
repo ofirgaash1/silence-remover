@@ -18,7 +18,7 @@ h1 {
   justify-content: center;
   height: 128px;
   border: 2px dashed #7f8c8d;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
   background-color: #fff;
   cursor: pointer;
   border-radius: 12px;
@@ -57,6 +57,40 @@ button:hover {
   opacity: 0.9;
 }
 
+#thresholdLine {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: rgba(0, 0, 0, 0.274);
+  pointer-events: none;
+  display: none;
+}
+
+/* Make the <wave> show a hand cursor */
+wave {
+  cursor: grab;
+  user-select: none;         /* so you don’t accidentally select text */
+  overflow-x: auto;          /* allow horizontal scrolling */
+  overflow-y: hidden;
+  /* hide the native scrollbar */
+  scrollbar-width: none;     /* Firefox */
+  -ms-overflow-style: none;  /* IE10+ */
+}
+wave::-webkit-scrollbar {     /* Chrome/Safari/Edge */
+  height: 0;
+}
+
+wave.dragging {
+  cursor: grabbing;
+}
+
+
+/* Chrome, Safari, Opera */
+.waveform-scroller::-webkit-scrollbar {
+  height: 0;
+}
+
 #waveform {
   width: 100%;
   height: 128px;
@@ -70,6 +104,7 @@ button:hover {
   background: #fff;
   border-radius: 12px;
   padding: 30px;
+  margin-top: 20px;
   margin-bottom: 30px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   max-width: 800px;
@@ -137,12 +172,15 @@ button:hover {
   box-shadow: 0 2px 6px rgba(0,0,0,0.05);
 }
 
-audio,
+
 video {
-  margin-top: 1px;
-  width: 80%;
-  max-width: 600px;
+
+  max-width: 250px;
+  height: auto; /* preserve aspect ratio */
   border-radius: 10px;
+  display: block;
+  margin: 20px auto 0 auto; /* center horizontally */
+  background: black;
 }
 
 .download-btn {
@@ -154,34 +192,6 @@ video {
 
 .download-btn:hover {
   background-color: #d35400;
-}
-
-#processingIndicator {
-  margin-top: 20px;
-  font-size: 16px;
-  color: #e74c3c;
-  font-weight: bold;
-}
-
-.combined-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 20px auto;
-  font-size: 0.95em;
-  max-width: 800px;
-}
-
-.combined-table th,
-.combined-table td {
-  border: 1px solid #ccc;
-  padding: 10px;
-  text-align: left;
-  vertical-align: top;
-}
-
-.combined-table th {
-  background-color: #ecf0f1;
-  font-weight: bold;
 }
 
 .event-silent-start td:nth-child(2) {
