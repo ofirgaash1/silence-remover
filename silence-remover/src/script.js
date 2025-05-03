@@ -39,6 +39,7 @@ export async function main() {
   setupUIEvents();
 
 }
+
 const title = document.getElementById('title');
 const dropZone = document.getElementById('drop-zone');
 const waveformDiv = document.getElementById('waveform');
@@ -203,29 +204,29 @@ function handleFile(file) {
 
   const wave = document.querySelector('#waveform wave');
   // when mouse goes down, start the “pan”
-wave.addEventListener('mousedown', e => {
-  isDown     = true;
-  startX     = e.pageX - wave.offsetLeft;
-  startScroll= wave.scrollLeft;
-  wave.classList.add('dragging');
-  e.preventDefault();  // prevent text selection
-});
+  wave.addEventListener('mousedown', e => {
+    isDown = true;
+    startX = e.pageX - wave.offsetLeft;
+    startScroll = wave.scrollLeft;
+    wave.classList.add('dragging');
+    e.preventDefault();  // prevent text selection
+  });
 
-// as you move, shift scrollLeft
-wave.addEventListener('mousemove', e => {
-  if (!isDown) return;
-  const x = e.pageX - wave.offsetLeft;
-  const delta = x - startX;
-  wave.scrollLeft = startScroll - delta;
-});
+  // as you move, shift scrollLeft
+  wave.addEventListener('mousemove', e => {
+    if (!isDown) return;
+    const x = e.pageX - wave.offsetLeft;
+    const delta = x - startX;
+    wave.scrollLeft = startScroll - delta;
+  });
 
-// on release/leave, stop panning
-['mouseup','mouseleave'].forEach(evt =>
-  wave.addEventListener(evt, () => {
-    isDown = false;
-    wave.classList.remove('dragging');
-  })
-);
+  // on release/leave, stop panning
+  ['mouseup', 'mouseleave'].forEach(evt =>
+    wave.addEventListener(evt, () => {
+      isDown = false;
+      wave.classList.remove('dragging');
+    })
+  );
 
 
   const reader = new FileReader();
@@ -301,6 +302,59 @@ function computePeaks(buffer) {
   }
   return peaks;
 }
+
+// easing function (easeInOutQuad)
+function easeInOutQuad(t) {
+  return t < 0.5
+    ? 2 * t * t
+    : -1 + (4 - 2 * t) * t;
+}
+
+/**
+ * Smoothly animates `el.scrollLeft` from its current value to `targetScroll`
+ * over `duration` milliseconds, using an ease-in-out curve.
+ */
+function smoothScrollTo(el, targetScroll, duration = 1000) {
+  
+  const startScroll = el.scrollLeft;
+  const change = targetScroll - startScroll;
+  const startTime = performance.now();
+
+  function frame(now) {
+    const elapsed = now - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = easeInOutQuad(progress);
+    el.scrollLeft = startScroll + change * eased;
+
+    if (progress < 1) {
+      requestAnimationFrame(frame);
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+/**
+ * Scrolls the waveform so that `timeInSec` lands in the center
+ * of the visible area, easing over 1 second.
+ */
+function scrollToTimeSmooth(timeInSec) {
+  const wave = document.querySelector('#waveform wave');
+  if (!wavesurfer) return;
+  const pxPerSec = wavesurfer.params.minPxPerSec;
+  const targetPx = timeInSec * pxPerSec;
+  // center it:
+  const offset = wave.clientWidth / 2;
+  let scrollPos = targetPx - offset;
+  // clamp into valid range:
+  scrollPos = Math.max(0, Math.min(scrollPos, wave.scrollWidth - wave.clientWidth));
+
+  smoothScrollTo(wave, scrollPos, 1000);
+}
+
+// Usage: jumps in smoothly to 12.3 s
+scrollToTimeSmooth(12.3);
+
 
 function handleThresholdChange() {
   if (!audioBuffer) return;
@@ -383,7 +437,7 @@ function applyShrinkFilter(shrinkMs) {
 }
 
 function drawRegions() {
-  
+
   if (!wavesurfer) return;
   Object.values(wavesurfer.regions.list).forEach(region => region.remove());
 
@@ -654,13 +708,13 @@ async function cutVideo() {
 
     // Write input file again (after first batch or restart)
     await ffmpeg.writeFile('input.mp4', await fetchFile(uploadedFile));
-
     for (let i = 0; i < batchRegions.length; i++) {
+
       const region = batchRegions[i];
       const segmentIndex = batchStart + i;
       const outputName = `part${segmentIndex}.mp4`;
       segmentFileNames.push(outputName);
-
+      scrollToTimeSmooth(region.start)
       title.innerText = `Encoding part ${segmentIndex + 1} of ${totalParts}...`
       wavesurfer.addRegion({
         start: region.start,
