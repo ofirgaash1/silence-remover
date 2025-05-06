@@ -26,7 +26,6 @@ let lastBlob = null;
 let outputFormat = 'mp3';
 let precomputedPeaks = [];
 let uploadedFile = null;
-let tweak = false;
 let ffmpeg;
 let fetchFile;
 let ffmpegLoaded = false;
@@ -60,11 +59,6 @@ const zoomSlider = document.getElementById('zoomSlider');
 const thresholdSlider = document.getElementById('thresholdSlider');
 const thresholdLine = document.getElementById('thresholdLine');
 const waveform = document.getElementById('waveform');
-
-
-let isDown = false;
-let startX, startScroll;
-
 
 
 thresholdSlider.addEventListener('input', updateThresholdLine);
@@ -188,7 +182,6 @@ function handleFile(file) {
   dropZone.style.display = 'none';
   waveformDiv.style.display = 'block';
 
-
   updateThresholdLine(); // Ensure line is placed immediately
 
   wavesurfer = WaveSurfer.create({
@@ -202,31 +195,131 @@ function handleFile(file) {
     plugins: [WaveSurfer.regions.create({})]
   });
 
+
+
+
+
+
+
+  
+
   const wave = document.querySelector('#waveform wave');
-  // when mouse goes down, start the “pan”
+
+  // === CONFIGURABLE PARAMETERS ===
+  const WHEEL_SENSITIVITY = 1 / 8;         // scale wheel input
+  const WHEEL_ACCELERATION = 0.15;          // how quickly velocity ramps up
+  const WHEEL_DECELERATION = 0.9;         // how slowly it slows down
+  const WHEEL_IDLE_TIMEOUT = 100;          // ms to wait before deceleration starts
+  
+  const DRAG_DECELERATION = 0.95;          // how slowly drag decays
+  const DRAG_STOP_THRESHOLD = 0.001;         // min velocity before stopping
+  const WHEEL_STOP_THRESHOLD = 0.001;        // min velocity before stopping
+  
+  // === DRAG STATE ===
+  let isDown = false;
+  let startX = 0;
+  let startScroll = 0;
+  let dragVelocity = 0;
+  let lastX = 0;
+  let dragMomentumId = null;
+  
+  // === WHEEL STATE ===
+  let wheelVelocity = 0;
+  let targetWheelVelocity = 0;
+  let wheelMomentumId = null;
+  let wheelTimeout = null;
+  
+  // === DRAG EVENTS ===
   wave.addEventListener('mousedown', e => {
     isDown = true;
     startX = e.pageX - wave.offsetLeft;
     startScroll = wave.scrollLeft;
+    lastX = startX;
+    cancelAnimationFrame(dragMomentumId);
     wave.classList.add('dragging');
-    e.preventDefault();  // prevent text selection
+    e.preventDefault();
   });
-
-  // as you move, shift scrollLeft
+  
   wave.addEventListener('mousemove', e => {
     if (!isDown) return;
     const x = e.pageX - wave.offsetLeft;
     const delta = x - startX;
+    dragVelocity = x - lastX;
+    lastX = x;
     wave.scrollLeft = startScroll - delta;
   });
-
-  // on release/leave, stop panning
+  
   ['mouseup', 'mouseleave'].forEach(evt =>
     wave.addEventListener(evt, () => {
+      if (!isDown) return;
       isDown = false;
       wave.classList.remove('dragging');
+      dragMomentum();
     })
   );
+  
+  // === DRAG INERTIA ===
+  function dragMomentum() {
+    if (Math.abs(dragVelocity) < DRAG_STOP_THRESHOLD) return;
+    wave.scrollLeft -= dragVelocity;
+    dragVelocity *= DRAG_DECELERATION;
+    dragMomentumId = requestAnimationFrame(dragMomentum);
+  }
+  
+  // === WHEEL EVENTS ===
+  wave.addEventListener('wheel', e => {
+    e.preventDefault();
+  
+    const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
+    targetWheelVelocity += scaledDelta;
+  
+    clearTimeout(wheelTimeout);
+    if (!wheelMomentumId) {
+      wheelMomentum(); // begin loop if not running
+    }
+  
+    wheelTimeout = setTimeout(() => {
+      targetWheelVelocity = 0;
+    }, WHEEL_IDLE_TIMEOUT);
+  }, { passive: false });
+  
+  function wheelMomentum() {
+    if (targetWheelVelocity !== 0) {
+      // While user is still interacting: ease toward target
+      wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
+    } else {
+      // After input stops: decelerate gradually
+      wheelVelocity *= WHEEL_DECELERATION;
+    }
+  
+    // Apply scroll
+    wave.scrollLeft += wheelVelocity;
+  
+    // Continue if still moving
+    if (Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD || Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD) {
+      wheelMomentumId = requestAnimationFrame(wheelMomentum);
+    } else {
+      wheelVelocity = 0;
+      targetWheelVelocity = 0;
+      wheelMomentumId = null;
+    }
+  }
+  
+  
+  
+  
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   const reader = new FileReader();
@@ -239,13 +332,10 @@ function handleFile(file) {
     }
   };
 
-  title.innerText = "test1"
-
   reader.onloadstart = () => {
     console.log("File reading started");
     title.innerText = "Starting file load...";
   };
-  title.innerText = "test2"
   reader.onload = async e => {
     console.log("File fully loaded into memory");
     title.innerText = "Tweak the sliders!"
@@ -294,7 +384,6 @@ function computePeaks(buffer) {
 
   const samplesPerChunk = Math.floor(data.length / numberOfPeaks);
   for (let i = 0; i < data.length; i += samplesPerChunk) {
-    //title.innerText = `Computing peaks: ${i} / ${data.length}`
     const slice = data.slice(i, i + samplesPerChunk);
     const peak = Math.max(...slice.map(Math.abs));
     const time = i / sampleRate;
@@ -303,7 +392,6 @@ function computePeaks(buffer) {
   return peaks;
 }
 
-// easing function (easeInOutQuad)
 function easeInOutQuad(t) {
   return t < 0.5
     ? 2 * t * t
@@ -376,7 +464,6 @@ function markSilentRegions() {
   let currentRegion = null;
   silentRegions = [];
   for (let i = 0; i < precomputedPeaks.length; i++) {
-    //title.innerText = `Marking silent regions: ${i} / ${precomputedPeaks.length}`
     const peakData = precomputedPeaks[i];
     const max = peakData.peak;
     const time = peakData.time;
@@ -622,8 +709,6 @@ function encodeMP3(buffer) {
   function floatTo16BitPCM(input) {
     const output = new Int16Array(input.length);
     for (let i = 0; i < input.length; i++) {
-      //if (i % 10 == 1) {
-      //title.innerText = `${i}`}
 
       output[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
     }
