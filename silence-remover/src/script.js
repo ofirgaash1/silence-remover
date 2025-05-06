@@ -75,15 +75,6 @@ function updateThresholdLine() {
   thresholdLine.style.top = `${yPos}px`;
 }
 
-
-zoomSlider.addEventListener('input', (e) => {
-  const minPxPerSec = e.target.valueAsNumber;
-  if (wavesurfer) {
-    wavesurfer.zoom(minPxPerSec);
-  }
-});
-
-
 function setupUIEvents() {
   downloadVideoBtn.style.display = 'none';
   vidTitle.style.display = 'none';
@@ -185,23 +176,25 @@ function handleFile(file) {
   updateThresholdLine(); // Ensure line is placed immediately
 
   wavesurfer = WaveSurfer.create({
+    container: waveformDiv,
     height: 128,
     scrollParent: false,
-    container: waveformDiv,
     waveColor: 'blue',
     progressColor: 'blue',
     backend: 'WebAudio',
-    responsive: true,
+    autoCenter: false, // may not do anything alone
     plugins: [WaveSurfer.regions.create({})]
   });
-
-
-
-
-
-
-
   
+  wavesurfer.on('ready', () => {
+    // Prevent zoom from auto-scrolling to playhead
+    wavesurfer.drawer.recenter = () => {};
+  });
+  
+  
+
+  title.innerText = wavesurfer.params.minPxPerSec
+
 
   const wave = document.querySelector('#waveform wave');
 
@@ -215,96 +208,146 @@ function handleFile(file) {
   const DRAG_STOP_THRESHOLD = 0.001;         // min velocity before stopping
   const WHEEL_STOP_THRESHOLD = 0.001;        // min velocity before stopping
   
-  // === DRAG STATE ===
-  let isDown = false;
-  let startX = 0;
-  let startScroll = 0;
-  let dragVelocity = 0;
-  let lastX = 0;
-  let dragMomentumId = null;
+
+
+
+
+
+
+
+
+
+  let latestZoomValue = 50; // default zoom value
+  let zoomTimeout = null;
   
-  // === WHEEL STATE ===
-  let wheelVelocity = 0;
-  let targetWheelVelocity = 0;
-  let wheelMomentumId = null;
-  let wheelTimeout = null;
+  zoomSlider.addEventListener('input', (e) => {
+    clearTimeout(zoomTimeout);
+    latestZoomValue = e.target.valueAsNumber;
   
-  // === DRAG EVENTS ===
-  wave.addEventListener('mousedown', e => {
-    isDown = true;
-    startX = e.pageX - wave.offsetLeft;
-    startScroll = wave.scrollLeft;
-    lastX = startX;
-    cancelAnimationFrame(dragMomentumId);
-    wave.classList.add('dragging');
-    e.preventDefault();
+    // Debounce zoom: wait until user stops sliding
+    zoomTimeout = setTimeout(() => {
+      applyZoom(latestZoomValue);
+    }, 1); // Increase for performance if needed
   });
   
-  wave.addEventListener('mousemove', e => {
+  function applyZoom(zoomValue) {
+    const scrollEl = wave; // Your scrollable container
+    const duration = audioBuffer?.duration || wavesurfer.getDuration() || 1;
+    const containerWidth = scrollEl.clientWidth;
+  
+    const currentPxPerSec =
+      wavesurfer.params.minPxPerSec || scrollEl.scrollWidth / duration;
+  
+    const scrollLeft = scrollEl.scrollLeft;
+    const centerPx = scrollLeft + containerWidth / 2;
+    const centerTime = centerPx / currentPxPerSec;
+  
+    const newPxPerSec = (containerWidth / duration) + zoomValue**2;
+  
+    if (wavesurfer) {
+      wavesurfer.zoom(newPxPerSec);
+  
+      // Now safe to apply scroll immediately — no more zoom "fighting"
+      const newCenterPx = centerTime * newPxPerSec;
+      scrollEl.scrollLeft = newCenterPx - containerWidth / 2;
+    }
+  
+    title.innerText = "Click and drag the waveform, or use the scroll wheel over it";
+  }
+  
+
+
+
+// === DRAG STATE ===
+let isDown = false;
+let startX = 0;
+let startScroll = 0;
+let dragVelocity = 0;
+let lastX = 0;
+let dragMomentumId = null;
+
+// === WHEEL STATE ===
+let wheelVelocity = 0;
+let targetWheelVelocity = 0;
+let wheelMomentumId = null;
+let wheelTimeout = null;
+
+// === DRAG EVENTS ===
+wave.addEventListener('mousedown', e => {
+  isDown = true;
+  startX = e.pageX - wave.offsetLeft;
+  startScroll = wave.scrollLeft;
+  lastX = startX;
+  cancelAnimationFrame(dragMomentumId);
+  wave.classList.add('dragging');
+  e.preventDefault();
+});
+
+wave.addEventListener('mousemove', e => {
+  if (!isDown) return;
+  const x = e.pageX - wave.offsetLeft;
+  const delta = x - startX;
+  dragVelocity = x - lastX;
+  lastX = x;
+  wave.scrollLeft = startScroll - delta;
+});
+
+['mouseup', 'mouseleave'].forEach(evt =>
+  wave.addEventListener(evt, () => {
     if (!isDown) return;
-    const x = e.pageX - wave.offsetLeft;
-    const delta = x - startX;
-    dragVelocity = x - lastX;
-    lastX = x;
-    wave.scrollLeft = startScroll - delta;
-  });
-  
-  ['mouseup', 'mouseleave'].forEach(evt =>
-    wave.addEventListener(evt, () => {
-      if (!isDown) return;
-      isDown = false;
-      wave.classList.remove('dragging');
-      dragMomentum();
-    })
-  );
-  
-  // === DRAG INERTIA ===
-  function dragMomentum() {
-    if (Math.abs(dragVelocity) < DRAG_STOP_THRESHOLD) return;
-    wave.scrollLeft -= dragVelocity;
-    dragVelocity *= DRAG_DECELERATION;
-    dragMomentumId = requestAnimationFrame(dragMomentum);
+    isDown = false;
+    wave.classList.remove('dragging');
+    dragMomentum();
+  })
+);
+
+// === DRAG INERTIA ===
+function dragMomentum() {
+  if (Math.abs(dragVelocity) < DRAG_STOP_THRESHOLD) return;
+  wave.scrollLeft -= dragVelocity;
+  dragVelocity *= DRAG_DECELERATION;
+  dragMomentumId = requestAnimationFrame(dragMomentum);
+}
+
+// === WHEEL EVENTS ===
+wave.addEventListener('wheel', e => {
+  e.preventDefault();
+
+  const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
+  targetWheelVelocity += scaledDelta;
+
+  clearTimeout(wheelTimeout);
+  if (!wheelMomentumId) {
+    wheelMomentum(); // begin loop if not running
   }
-  
-  // === WHEEL EVENTS ===
-  wave.addEventListener('wheel', e => {
-    e.preventDefault();
-  
-    const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
-    targetWheelVelocity += scaledDelta;
-  
-    clearTimeout(wheelTimeout);
-    if (!wheelMomentumId) {
-      wheelMomentum(); // begin loop if not running
-    }
-  
-    wheelTimeout = setTimeout(() => {
-      targetWheelVelocity = 0;
-    }, WHEEL_IDLE_TIMEOUT);
-  }, { passive: false });
-  
-  function wheelMomentum() {
-    if (targetWheelVelocity !== 0) {
-      // While user is still interacting: ease toward target
-      wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
-    } else {
-      // After input stops: decelerate gradually
-      wheelVelocity *= WHEEL_DECELERATION;
-    }
-  
-    // Apply scroll
-    wave.scrollLeft += wheelVelocity;
-  
-    // Continue if still moving
-    if (Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD || Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD) {
-      wheelMomentumId = requestAnimationFrame(wheelMomentum);
-    } else {
-      wheelVelocity = 0;
-      targetWheelVelocity = 0;
-      wheelMomentumId = null;
-    }
+
+  wheelTimeout = setTimeout(() => {
+    targetWheelVelocity = 0;
+  }, WHEEL_IDLE_TIMEOUT);
+}, { passive: false });
+
+function wheelMomentum() {
+  if (targetWheelVelocity !== 0) {
+    // While user is still interacting: ease toward target
+    wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
+  } else {
+    // After input stops: decelerate gradually
+    wheelVelocity *= WHEEL_DECELERATION;
   }
-  
+
+  // Apply scroll
+  wave.scrollLeft += wheelVelocity;
+
+  // Continue if still moving
+  if (Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD || Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD) {
+    wheelMomentumId = requestAnimationFrame(wheelMomentum);
+  } else {
+    wheelVelocity = 0;
+    targetWheelVelocity = 0;
+    wheelMomentumId = null;
+  }
+}
+
   
   
   
@@ -492,9 +535,11 @@ function markSilentRegions() {
   }
   thresholdLine.style.display = 'block';
   title.innerText = "Silent parts in red will be removed - Tweak the sliders carefully :)"
+
   applyShrinkFilter(shrinkMs);
   drawRegions();
   updateStats();
+
 
 }
 
@@ -913,7 +958,6 @@ async function mergeAllBatches() {
   scrollToBottomWithDelay()
   console.log("Final video merged and loaded.");
 }
-
 
 async function concatSegments(fileNames, outputFileName = 'final.mp4') {
   await ffmpeg.writeFile('list.txt', fileNames.map(name => `file '${name}'`).join('\n'));
