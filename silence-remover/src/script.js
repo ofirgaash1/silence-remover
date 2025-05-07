@@ -1054,3 +1054,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+document.getElementById('invert').addEventListener('click', invertSilentRegions);
+function invertSilentRegions() {
+  if (!silentRegions || silentRegions.length === 0) {
+    alert("No silent regions to invert.");
+    return;
+  }
+
+  const nonSilentRegions = [];
+  let prevEnd = 0;
+
+  for (let i = 0; i < silentRegions.length; i++) {
+    const region = silentRegions[i];
+    if (region.start > prevEnd) {
+      nonSilentRegions.push({ start: prevEnd, end: region.start });
+    }
+    prevEnd = region.end;
+  }
+
+  // Final region, if any audio left at the end
+  if (prevEnd < audioBuffer.duration) {
+    nonSilentRegions.push({ start: prevEnd, end: audioBuffer.duration });
+  }
+
+  silentRegions = nonSilentRegions;
+
+  drawRegions();
+  updateStats();
+}
