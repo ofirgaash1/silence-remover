@@ -56,9 +56,12 @@ const downloadVideoBtn = document.getElementById('downloadVideoBtn');
 const statsPanel = document.getElementById('statsPanel');
 const vidTitle = document.getElementById('vidTitle');
 const zoomSlider = document.getElementById('zoomSlider');
+const zoomInput = document.getElementById('zoomInput');
+
 const thresholdSlider = document.getElementById('thresholdSlider');
 const thresholdLine = document.getElementById('thresholdLine');
 const waveform = document.getElementById('waveform');
+
 
 
 thresholdSlider.addEventListener('input', updateThresholdLine);
@@ -76,10 +79,8 @@ function updateThresholdLine() {
 }
 
 function setupUIEvents() {
-  downloadVideoBtn.style.display = 'none';
   vidTitle.style.display = 'none';
   audioPreview.style.display = 'none';
-  downloadBtn.style.display = 'none';
 
   browseBtn.addEventListener('click', () => fileInput.click());
   fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
@@ -112,6 +113,7 @@ function setupUIEvents() {
     shrinkSlider.value = e.target.value;
     handleShrinkChange();
   });
+
   formatButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       formatButtons.forEach(b => {
@@ -177,6 +179,7 @@ function handleFile(file) {
 
   wavesurfer = WaveSurfer.create({
     container: waveformDiv,
+    cursorWidth: 0,
     height: 128,
     scrollParent: false,
     waveColor: 'blue',
@@ -185,13 +188,13 @@ function handleFile(file) {
     autoCenter: false, // may not do anything alone
     plugins: [WaveSurfer.regions.create({})]
   });
-  
+
   wavesurfer.on('ready', () => {
     // Prevent zoom from auto-scrolling to playhead
-    wavesurfer.drawer.recenter = () => {};
+    wavesurfer.drawer.recenter = () => { };
   });
-  
-  
+
+
 
   title.innerText = wavesurfer.params.minPxPerSec
 
@@ -203,154 +206,147 @@ function handleFile(file) {
   const WHEEL_ACCELERATION = 0.15;          // how quickly velocity ramps up
   const WHEEL_DECELERATION = 0.9;         // how slowly it slows down
   const WHEEL_IDLE_TIMEOUT = 100;          // ms to wait before deceleration starts
-  
+
   const DRAG_DECELERATION = 0.95;          // how slowly drag decays
   const DRAG_STOP_THRESHOLD = 0.001;         // min velocity before stopping
   const WHEEL_STOP_THRESHOLD = 0.001;        // min velocity before stopping
-  
-
-
-
-
-
-
-
 
 
   let latestZoomValue = 50; // default zoom value
   let zoomTimeout = null;
-  
+
   zoomSlider.addEventListener('input', (e) => {
+    zoomInput.value = (e.target.value * 100 / 8).toFixed(2);
     clearTimeout(zoomTimeout);
     latestZoomValue = e.target.valueAsNumber;
-  
+
     // Debounce zoom: wait until user stops sliding
     zoomTimeout = setTimeout(() => {
       applyZoom(latestZoomValue);
     }, 1); // Increase for performance if needed
   });
-  
+
   function applyZoom(zoomValue) {
     const scrollEl = wave; // Your scrollable container
     const duration = audioBuffer?.duration || wavesurfer.getDuration() || 1;
     const containerWidth = scrollEl.clientWidth;
-  
+
     const currentPxPerSec =
       wavesurfer.params.minPxPerSec || scrollEl.scrollWidth / duration;
-  
+
     const scrollLeft = scrollEl.scrollLeft;
     const centerPx = scrollLeft + containerWidth / 2;
     const centerTime = centerPx / currentPxPerSec;
-  
-    const newPxPerSec = (containerWidth / duration) + zoomValue**2;
-  
+
+    const newPxPerSec = (containerWidth / duration) + zoomValue ** 2;
+
     if (wavesurfer) {
       wavesurfer.zoom(newPxPerSec);
-  
+
       // Now safe to apply scroll immediately — no more zoom "fighting"
       const newCenterPx = centerTime * newPxPerSec;
       scrollEl.scrollLeft = newCenterPx - containerWidth / 2;
     }
-  
+
     title.innerText = "Click and drag the waveform, or use the scroll wheel over it";
   }
-  
 
 
 
-// === DRAG STATE ===
-let isDown = false;
-let startX = 0;
-let startScroll = 0;
-let dragVelocity = 0;
-let lastX = 0;
-let dragMomentumId = null;
 
-// === WHEEL STATE ===
-let wheelVelocity = 0;
-let targetWheelVelocity = 0;
-let wheelMomentumId = null;
-let wheelTimeout = null;
+  // === DRAG STATE ===
+  let isDown = false;
+  let startX = 0;
+  let startScroll = 0;
+  let dragVelocity = 0;
+  let lastX = 0;
+  let dragMomentumId = null;
 
-// === DRAG EVENTS ===
-wave.addEventListener('mousedown', e => {
-  isDown = true;
-  startX = e.pageX - wave.offsetLeft;
-  startScroll = wave.scrollLeft;
-  lastX = startX;
-  cancelAnimationFrame(dragMomentumId);
-  wave.classList.add('dragging');
-  e.preventDefault();
-});
+  // === WHEEL STATE ===
+  let wheelVelocity = 0;
+  let targetWheelVelocity = 0;
+  let wheelMomentumId = null;
+  let wheelTimeout = null;
 
-wave.addEventListener('mousemove', e => {
-  if (!isDown) return;
-  const x = e.pageX - wave.offsetLeft;
-  const delta = x - startX;
-  dragVelocity = x - lastX;
-  lastX = x;
-  wave.scrollLeft = startScroll - delta;
-});
+  // === DRAG EVENTS ===
+  wave.addEventListener('mousedown', e => {
+    isDown = true;
+    startX = e.pageX - wave.offsetLeft;
+    startScroll = wave.scrollLeft;
+    lastX = startX;
+    cancelAnimationFrame(dragMomentumId);
+    wave.classList.add('dragging');
+    e.preventDefault();
+  });
 
-['mouseup', 'mouseleave'].forEach(evt =>
-  wave.addEventListener(evt, () => {
+  wave.addEventListener('mousemove', e => {
     if (!isDown) return;
-    isDown = false;
-    wave.classList.remove('dragging');
-    dragMomentum();
-  })
-);
+    const x = e.pageX - wave.offsetLeft;
+    const delta = x - startX;
+    dragVelocity = x - lastX;
+    lastX = x;
+    wave.scrollLeft = startScroll - delta;
+  });
 
-// === DRAG INERTIA ===
-function dragMomentum() {
-  if (Math.abs(dragVelocity) < DRAG_STOP_THRESHOLD) return;
-  wave.scrollLeft -= dragVelocity;
-  dragVelocity *= DRAG_DECELERATION;
-  dragMomentumId = requestAnimationFrame(dragMomentum);
-}
+  ['mouseup', 'mouseleave'].forEach(evt =>
+    wave.addEventListener(evt, () => {
+      if (!isDown) return;
+      isDown = false;
+      wave.classList.remove('dragging');
+      dragMomentum();
+    })
+  );
 
-// === WHEEL EVENTS ===
-wave.addEventListener('wheel', e => {
-  e.preventDefault();
-
-  const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
-  targetWheelVelocity += scaledDelta;
-
-  clearTimeout(wheelTimeout);
-  if (!wheelMomentumId) {
-    wheelMomentum(); // begin loop if not running
+  // === DRAG INERTIA ===
+  function dragMomentum() {
+    if (Math.abs(dragVelocity) < DRAG_STOP_THRESHOLD) return;
+    wave.scrollLeft -= dragVelocity;
+    dragVelocity *= DRAG_DECELERATION;
+    dragMomentumId = requestAnimationFrame(dragMomentum);
   }
 
-  wheelTimeout = setTimeout(() => {
-    targetWheelVelocity = 0;
-  }, WHEEL_IDLE_TIMEOUT);
-}, { passive: false });
+  // === WHEEL EVENTS ===
+  wave.addEventListener('wheel', e => {
+    e.preventDefault();
 
-function wheelMomentum() {
-  if (targetWheelVelocity !== 0) {
-    // While user is still interacting: ease toward target
-    wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
-  } else {
-    // After input stops: decelerate gradually
-    wheelVelocity *= WHEEL_DECELERATION;
+    const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
+    targetWheelVelocity += scaledDelta;
+
+    clearTimeout(wheelTimeout);
+    if (!wheelMomentumId) {
+      wheelMomentum(); // begin loop if not running
+    }
+
+    wheelTimeout = setTimeout(() => {
+      targetWheelVelocity = 0;
+    }, WHEEL_IDLE_TIMEOUT);
+  }, { passive: false });
+
+  function wheelMomentum() {
+    if (targetWheelVelocity !== 0) {
+      // While user is still interacting: ease toward target
+      wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
+    } else {
+      // After input stops: decelerate gradually
+      wheelVelocity *= WHEEL_DECELERATION;
+    }
+
+    // Apply scroll
+    wave.scrollLeft += wheelVelocity;
+
+    // Continue if still moving
+    if (Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD || Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD) {
+      wheelMomentumId = requestAnimationFrame(wheelMomentum);
+    } else {
+      wheelVelocity = 0;
+      targetWheelVelocity = 0;
+      wheelMomentumId = null;
+    }
   }
 
-  // Apply scroll
-  wave.scrollLeft += wheelVelocity;
 
-  // Continue if still moving
-  if (Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD || Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD) {
-    wheelMomentumId = requestAnimationFrame(wheelMomentum);
-  } else {
-    wheelVelocity = 0;
-    targetWheelVelocity = 0;
-    wheelMomentumId = null;
-  }
-}
 
-  
-  
-  
+
 
 
 
@@ -390,7 +386,7 @@ function wheelMomentum() {
       title.innerText = "Audio decoded, normalizing...";
       normalizeAudioBuffer(audioBuffer);
       precomputedPeaks = computePeaks(audioBuffer);
-
+      autoAdjustThresholdSlider()
       console.log("Processing regions...");
       handleThresholdChange();
       drawRegions();
@@ -420,10 +416,15 @@ function wheelMomentum() {
 }
 
 function computePeaks(buffer) {
+  const originalDuration = audioBuffer ? (audioBuffer.duration || 0) : 0;
   const data = buffer.getChannelData(0);
   const sampleRate = buffer.sampleRate;
   const peaks = [];
-  const numberOfPeaks = 20000;
+  const numberOfPeaks = 250 * Math.floor(audioBuffer.duration); // desired peaks per second * number of seconds
+  console.log("@@@@@@@@@@@@@");
+  console.log(numberOfPeaks);
+  
+  
 
   const samplesPerChunk = Math.floor(data.length / numberOfPeaks);
   for (let i = 0; i < data.length; i += samplesPerChunk) {
@@ -446,7 +447,7 @@ function easeInOutQuad(t) {
  * over `duration` milliseconds, using an ease-in-out curve.
  */
 function smoothScrollTo(el, targetScroll, duration = 1000) {
-  
+
   const startScroll = el.scrollLeft;
   const change = targetScroll - startScroll;
   const startTime = performance.now();
@@ -497,75 +498,104 @@ function handleShrinkChange() {
   markSilentRegions();
 }
 
+function applyShrinkFilter(shrinkMs, minRegionDuration) {
+  const shrinkSec = shrinkMs / 1000;
+
+  for (let region of silentRegions) {
+    const duration = region.end - region.start;
+    const reduction = Math.min(duration, shrinkSec);
+    const newDuration = duration - reduction;
+
+    // Keep it centered
+    const center = (region.start + region.end) / 2;
+    region.start = center - newDuration / 2;
+    region.end = center + newDuration / 2;
+  }
+
+  // Remove any that became too short
+  if (silentRegions.some(r => (r.end - r.start) < minRegionDuration)) {
+    silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
+  }
+  console.log(silentRegions);
+  
+}
+
+function enforceMinRegionDuration(regions, minDuration) {
+  if (!regions.length) return [];
+
+  const merged = [ { ...regions[0] } ];
+
+  for (let i = 1; i < regions.length; i++) {
+    const prev = merged[merged.length - 1];
+    const current = regions[i];
+
+    const gap = current.start - prev.end;
+
+    if (gap < minDuration) {
+      // Merge current into previous
+      prev.end = current.end;
+    } else {
+      const duration = current.end - current.start;
+      if (duration >= minDuration) {
+        merged.push({ ...current });
+      }
+      // else skip this region entirely
+    }
+  }
+
+  return merged;
+}
+
+
+
 function markSilentRegions() {
   const raw = +thresholdSlider.value / 100;
   const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
   const threshold = mapped * mapped;
   const shrinkMs = +shrinkSlider.value;
+  const minRegionDuration = 0.1;
 
+  silentRegions = [];
   let silent = false;
   let currentRegion = null;
-  silentRegions = [];
+
   for (let i = 0; i < precomputedPeaks.length; i++) {
-    const peakData = precomputedPeaks[i];
-    const max = peakData.peak;
-    const time = peakData.time;
+    const { peak: max, time } = precomputedPeaks[i];
 
     if (max <= threshold) {
       if (!silent) {
-        currentRegion = { start: time };
+        if (currentRegion && (time - currentRegion.end) < minRegionDuration) {
+          currentRegion.end = time;
+        } else {
+          currentRegion = { start: time };
+        }
         silent = true;
       }
     } else {
       if (silent) {
         currentRegion.end = time;
-        if ((currentRegion.end - currentRegion.start) > 0.05) {
-          silentRegions.push(currentRegion);
+        if ((currentRegion.end - currentRegion.start) > minRegionDuration) {
+          silentRegions.push({ ...currentRegion });
         }
         silent = false;
+        currentRegion = null;
       }
     }
   }
 
   if (silent && currentRegion) {
     currentRegion.end = audioBuffer.duration;
-    if ((currentRegion.end - currentRegion.start) > 0.05) {
-      silentRegions.push(currentRegion);
+    if ((currentRegion.end - currentRegion.start) > minRegionDuration) {
+      silentRegions.push({ ...currentRegion });
     }
   }
-  thresholdLine.style.display = 'block';
-  title.innerText = "Silent parts in red will be removed - Tweak the sliders carefully :)"
 
-  applyShrinkFilter(shrinkMs);
+  applyShrinkFilter(shrinkMs, minRegionDuration);
+  silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
+  thresholdLine.style.display = 'block';
+  title.innerText = "Silent parts in red will be removed - Tweak the sliders carefully :)";
   drawRegions();
   updateStats();
-
-
-}
-
-function applyShrinkFilter(shrinkMs) {
-  const shrink = shrinkMs / 1000;
-  const duration = audioBuffer ? audioBuffer.duration : 0;
-
-  silentRegions = silentRegions
-    .map(region => {
-      let start = region.start;
-      let end = region.end;
-
-      // Only shrink start if it's not at 0
-      if (region.start > 0) {
-        start = region.start + shrink;
-      }
-
-      // Only shrink end if it's not at duration
-      if (region.end < duration) {
-        end = region.end - shrink;
-      }
-
-      // Return null if invalid region after shrinking
-      return start < end ? { start, end } : null;
-    })
-    .filter(region => region && (region.end - region.start) > 0.01);
 }
 
 function drawRegions() {
@@ -592,7 +622,15 @@ function updateStats() {
   });
   const timeSaved = totalSilence.toFixed(2);
   const percentSaved = (originalDuration ? (timeSaved / originalDuration * 100) : 0).toFixed(1);
-  statsPanel.innerText = `Time saved: ${timeSaved}s - ${percentSaved}% shorter - ${silentRegions.length} silence regions`;
+  let minutes = Math.floor(timeSaved / 60);
+  let seconds = +(timeSaved % 60).toFixed(0); // round to 2 decimal places
+
+  let timeDisplay = timeSaved > 60
+    ? `${minutes}m ${seconds}s`
+    : `${seconds}s`;
+
+  statsPanel.innerText = `Time saved: ${timeDisplay} - ${percentSaved}% shorter - ${silentRegions.length} silence regions`;
+
 }
 
 async function cutAudio() {
@@ -835,12 +873,12 @@ async function cutVideo() {
   let psScriptLines = [];
   let bashScriptLines = [];
   let fileListLines = [];
-  
+
   for (let batchStart = 0; batchStart < nonSilentRegions.length; batchStart += BATCH_SIZE) {
     const batchRegions = nonSilentRegions.slice(batchStart, batchStart + BATCH_SIZE);
     const segmentFileNames = [];
     console.log(`--- Processing batch ${batchIndex + 1} ---`);
-  
+
     // Write input file again (after first batch or restart)
     await ffmpeg.writeFile('input.mp4', await fetchFile(uploadedFile));
     for (let i = 0; i < batchRegions.length; i++) {
@@ -849,7 +887,7 @@ async function cutVideo() {
       const outputName = `part${segmentIndex}.mp4`;
       segmentFileNames.push(outputName);
       allSegmentFileNames.push(outputName);
-  
+
       scrollToTimeSmooth(region.start);
       title.innerText = `Encoding part ${segmentIndex + 1} of ${totalParts}...`;
       wavesurfer.addRegion({
@@ -859,7 +897,7 @@ async function cutVideo() {
         drag: false,
         resize: false
       });
-  
+
       const args = [
         '-ss', region.start.toFixed(6),
         '-i', 'input.mp4',
@@ -876,10 +914,10 @@ async function cutVideo() {
         '-avoid_negative_ts', '1',
         outputName
       ];
-  
+
       console.log(args);
       await ffmpeg.exec(args);
-  
+
       // Add to PowerShell and Bash script lines
       const start = region.start.toFixed(6);
       const duration = (region.end - region.start).toFixed(6);
@@ -887,15 +925,15 @@ async function cutVideo() {
       bashScriptLines.push(`ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`);
       fileListLines.push(`file '${outputName}'`);
     }
-  
+
     // Concatenate this batch (optional)
     const batchOutputName = `final_batch_${batchIndex}.mp4`;
     await concatSegments(segmentFileNames, batchOutputName);
-  
+
     // Read result to memory
     const batchData = await ffmpeg.readFile(batchOutputName);
     fullOutputBuffers.push(batchData);
-  
+
     // Reset FFmpeg instance
     ffmpegLoaded = false;
     ffmpeg = null;
@@ -903,18 +941,18 @@ async function cutVideo() {
     await initFFmpeg();
     batchIndex++;
   }
-  
+
   // Add final concat logic to scripts
   psScriptLines.push('\n@"\n' + fileListLines.join('\n') + '\n"@ | Out-File -Encoding ASCII list.txt');
   psScriptLines.push('ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4\n');
-  
+
   bashScriptLines.push('cat << EOF > list.txt\n' + fileListLines.join('\n') + '\nEOF');
   bashScriptLines.push('ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4');
-  
+
   // Output to textareas
   document.getElementById("psScript").value = psScriptLines.join('\n');
   document.getElementById("bashScript").value = bashScriptLines.join('\n');
-  
+
 
   // Save the buffers for further use (merge all batches, etc.)
   window.processedBatches = fullOutputBuffers;
@@ -957,7 +995,7 @@ async function mergeAllBatches() {
     'final_merged.mp4'
   ];
   console.log(args);
-  
+
   await ffmpegMerge.exec(args);
 
   // Read final merged output
@@ -967,13 +1005,14 @@ async function mergeAllBatches() {
 
   // Display or download
   const videoPreview = document.querySelector('#videoPreview');
-  const downloadButton = document.querySelector('#downloadVideoBtn');
   title.innerText = "Done! Consider donating ❤";
 
   videoPreview.src = url;
   videoPreview.style.display = 'inline-block';
-  downloadButton.style.display = 'inline-block';
-  downloadButton.onclick = () => {
+  downloadVideoBtn.style.display = 'inline-block';
+  copyBtnBASH.style.display = 'inline-block';
+  copyBtnPS.style.display = 'inline-block';
+  downloadVideoBtn.onclick = () => {
     const a = document.createElement('a');
     a.href = url;
     a.download = 'final_merged.mp4';
@@ -1082,4 +1121,62 @@ function invertSilentRegions() {
 
   drawRegions();
   updateStats();
+}
+
+function autoAdjustThresholdSlider() {
+  const originalMin = 0;
+  const originalMax = 100;
+  const step = 0.5;
+
+  const savedShrink = +shrinkSlider.value;
+  shrinkSlider.value = 0; // avoid distortion during detection
+
+  let foundMin = null;
+  let foundMax = null;
+  let prevFound = null;
+  const originalThreshold = thresholdSlider.value;
+
+  const scan = (from, to, direction) => {
+    for (let val = from; direction > 0 ? val <= to : val >= to; val += direction * step) {
+      thresholdSlider.value = val;
+      handleThresholdChange(); // triggers markSilentRegions
+      const originalDuration = audioBuffer.duration || 0;
+
+      let totalSilence = 0;
+      for (const region of silentRegions) {
+        totalSilence += (region.end - region.start);
+      }
+
+      const timeSaved = totalSilence;
+      const percentSaved = (originalDuration ? (timeSaved / originalDuration * 100) : 0);
+      
+      if (direction > 0 && percentSaved > 0) {
+        foundMin = prevFound;
+        break;
+      }
+
+      if (direction < 0 && percentSaved < 100) {
+        foundMax = prevFound;
+        break;
+      }
+      prevFound = val
+    }
+  };
+
+  // Step 1: scan from 0 → up
+  scan(0, 100, 1);
+
+  // Step 2: scan from 100 → down
+  scan(100, 0, -1);
+
+  // Update slider bounds
+  if (foundMin !== null) thresholdSlider.min = foundMin.toFixed(2);
+  if (foundMax !== null) thresholdSlider.max = foundMax.toFixed(2);
+
+  // Restore slider state
+  thresholdSlider.value = originalThreshold;
+  shrinkSlider.value = savedShrink;
+
+  handleThresholdChange(); // reapply current threshold
+  console.log(`Threshold range adjusted: ${thresholdSlider.min}% – ${thresholdSlider.max}%`);
 }

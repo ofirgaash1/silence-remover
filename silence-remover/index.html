@@ -1,99 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Audio & Video Silence Cutter</title>
   <link rel="stylesheet" href="./src/style.css">
 </head>
+
 <body>
 
-<h1 id="title">Audio & Video Silence Cutter</h1>
+  <h1 id="title">Audio & Video Silence Cutter</h1>
 
-<!-- Drag & Drop or Browse Area -->
-<div id="drop-zone" class="drop-zone">
-  <div id="drop-zone-text">
-    <p>Drag & drop an audio or video file here<br>or <button id="browseBtn">Choose File</button></p>
-    <input type="file" id="audioFile" accept="audio/*,video/mp4" style="display:none;">
-  </div>
-</div>
-
-<!-- Waveform Container -->
-<div id="waveformContainer" style="position: relative;">
-  <div id="waveform" class="waveform" style="display:none;"></div>
-  <div id="thresholdLine"></div>
-</div>
-
-<label class="slider-row">
-  Zoom: <input type="range" id="zoomSlider" min="0" max="8" value="0" step="0.01"/>
-</label>
-
-<!-- Sliders and Controls -->
-<div class="controls">
-
-  <div class="control-group">
-    <label for="thresholdSlider">Amplitude Threshold:</label>
-    <div class="slider-row">
-      <input type="range" id="thresholdSlider" min="0" max="100" step="0.01">
-      <input type="number" id="thresholdInput" step="0.01">% 
+  <!-- Drag & Drop or Browse Area -->
+  <div id="drop-zone" class="drop-zone">
+    <div id="drop-zone-text">
+      <p>Drag & drop an audio or video file here<br>or <button id="browseBtn">Choose File</button></p>
+      <input type="file" id="audioFile" accept="audio/*,video/mp4" style="display:none;">
     </div>
   </div>
 
-  <div class="control-group">
-    <label for="shrinkSlider">Shrink Silence:</label>
-    <div class="slider-row">
-      <input type="range" id="shrinkSlider" min="0" value="0" max="1000" step="1">
-      <input type="number" id="shrinkInput" step="1">ms
-    </div>
+  <!-- Waveform Container -->
+  <div id="waveformContainer" style="position: relative;">
+    <div id="waveform" class="waveform" style="display:none;"></div>
+    <div id="thresholdLine"></div>
   </div>
 
-  <h3>Combined Timeline Events:</h3>
-  <div id="combinedTableContainer">
+
+
+  <!-- Sliders and Controls -->
+  <div class="controls">
+
+    <div class="control-group">
+      <label for="zoomSlider">Zoom:</label>
+      <label class="slider-row">
+        <input type="range" id="zoomSlider" min="0" max="8" value="0" step="0.01" />
+        <input type="number" id="zoomInput" step="0.01">%
+      </label>
+    </div>
+
+    <div class="control-group">
+      <label for="thresholdSlider">Amplitude Threshold:</label>
+      <div class="slider-row">
+        <input type="range" id="thresholdSlider" min="0" max="100" step="0.01">
+        <input type="number" id="thresholdInput" step="0.01">%
       </div>
-  
-  <div class="format-controls">
-    <label>Audio Output Format:</label>
-    <button class="fmt-btn selected" data-format="mp3">MP3 ✓</button>
-    <button class="fmt-btn" data-format="wav">WAV</button>
+    </div>
+
+    <div class="control-group">
+      <label for="shrinkSlider">Shrink Silence:</label>
+      <div class="slider-row">
+        <input type="range" id="shrinkSlider" min="0" value="0" max="1000" step="1">
+        <input type="number" id="shrinkInput" step="1">ms
+      </div>
+    </div>
+
+    <div class="format-controls">
+      <label>Audio Output Format:</label>
+      <button class="fmt-btn selected" data-format="mp3">MP3 ✓</button>
+      <button class="fmt-btn" data-format="wav">WAV</button>
+    </div>
+
+    <div class="button-row">
+      <button id="cutAudio">Create Audio</button>
+      <button id="cutVideoBtn">Create Video</button>
+      <button id="invert">Invert</button>
+    </div>
+
   </div>
 
-  <div class="button-row">
-    <button id="cutAudio">Create Audio</button>
-    <button id="cutVideoBtn">Create Video</button>
-  </div>
-
-</div>
-
-<!-- Statistics Panel -->
-<h3>Statistics:</h3>
-<div id="statsPanel">Time saved: 0s - 0% shorter - 0 silence regions</div>
-<form action="https://www.paypal.com/donate" method="post" target="_top">
-  <input type="hidden" name="hosted_button_id" value="MRJF9A83YR2BE" />
-  <input type="image" src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif" border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
-  <img alt="" border="0" src="https://www.paypal.com/en_IL/i/scr/pixel.gif" width="1" height="1" />
+  <!-- Statistics Panel -->
+  <div id="statsPanel">Time saved: 0s - 0% shorter - 0 silence regions</div>
+  <form action="https://www.paypal.com/donate" method="post" target="_top">
+    <input type="hidden" name="hosted_button_id" value="MRJF9A83YR2BE" />
+    <input type="image" src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif" border="0" name="submit"
+      title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+    <img alt="" border="0" src="https://www.paypal.com/en_IL/i/scr/pixel.gif" width="1" height="1" />
   </form>
-<!-- Audio Preview -->
+  <!-- Audio Preview -->
 
-<audio id="audioPreview" controls></audio>
-<br>
-<button id="AudioDownloadBtn" class="download-btn">Download Audio</button>
+  <audio id="audioPreview" controls></audio>
+  <br>
+  <button id="AudioDownloadBtn" class="download-btn">Download Audio</button>
 
-<!-- Video Preview -->
-<h3 id = vidTitle>Video Preview:</h3>
-<video id="videoPreview" controls style="display:none; width:100%;"></video>
-<br>
-<button id="downloadVideoBtn" class="download-btn">Download Video</button>
+  <!-- Video Preview -->
+  <h3 id=vidTitle>Video Preview:</h3>
+  <video id="videoPreview" controls style="display:none; width:100%;"></video>
+  <br>
+  <button id="downloadVideoBtn" class="download-btn">Download Video</button>
 
-<!-- Processing Indicator -->
-<textarea id="psScript" readonly></textarea>
-<textarea id="bashScript" readonly></textarea>
-<button id="copyBtnPS">Copy PowerShell script</button>
-<button id="copyBtnBASH">Copy Bash script</button>
-<button id="invert">Invert</button>
-<!-- Script dependencies -->
-<script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
-<script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
-<script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
-<script type="module" src="./src/script.js"></script>
+  <!-- Processing Indicator -->
+  <textarea id="psScript" readonly></textarea>
+  <textarea id="bashScript" readonly></textarea>
+  <button id="copyBtnPS">Copy PowerShell script</button>
+  <button id="copyBtnBASH">Copy Bash script</button>
+  <!-- Script dependencies -->
+  <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
+  <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
+  <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
+  <script type="module" src="./src/script.js"></script>
 
 </body>
+
 </html>
