@@ -831,21 +831,27 @@ async function cutVideo() {
   }
 
   let totalParts = nonSilentRegions.length
+  let allSegmentFileNames = [];
+  let psScriptLines = [];
+  let bashScriptLines = [];
+  let fileListLines = [];
+  
   for (let batchStart = 0; batchStart < nonSilentRegions.length; batchStart += BATCH_SIZE) {
     const batchRegions = nonSilentRegions.slice(batchStart, batchStart + BATCH_SIZE);
     const segmentFileNames = [];
     console.log(`--- Processing batch ${batchIndex + 1} ---`);
-
+  
     // Write input file again (after first batch or restart)
     await ffmpeg.writeFile('input.mp4', await fetchFile(uploadedFile));
     for (let i = 0; i < batchRegions.length; i++) {
-
       const region = batchRegions[i];
       const segmentIndex = batchStart + i;
       const outputName = `part${segmentIndex}.mp4`;
       segmentFileNames.push(outputName);
-      scrollToTimeSmooth(region.start)
-      title.innerText = `Encoding part ${segmentIndex + 1} of ${totalParts}...`
+      allSegmentFileNames.push(outputName);
+  
+      scrollToTimeSmooth(region.start);
+      title.innerText = `Encoding part ${segmentIndex + 1} of ${totalParts}...`;
       wavesurfer.addRegion({
         start: region.start,
         end: region.end,
@@ -853,7 +859,7 @@ async function cutVideo() {
         drag: false,
         resize: false
       });
-
+  
       const args = [
         '-ss', region.start.toFixed(6),
         '-i', 'input.mp4',
@@ -870,28 +876,45 @@ async function cutVideo() {
         '-avoid_negative_ts', '1',
         outputName
       ];
-
+  
+      console.log(args);
       await ffmpeg.exec(args);
+  
+      // Add to PowerShell and Bash script lines
+      const start = region.start.toFixed(6);
+      const duration = (region.end - region.start).toFixed(6);
+      psScriptLines.push(`ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`);
+      bashScriptLines.push(`ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`);
+      fileListLines.push(`file '${outputName}'`);
     }
-
-    // Concatenate this batch
+  
+    // Concatenate this batch (optional)
     const batchOutputName = `final_batch_${batchIndex}.mp4`;
     await concatSegments(segmentFileNames, batchOutputName);
-
+  
     // Read result to memory
     const batchData = await ffmpeg.readFile(batchOutputName);
     fullOutputBuffers.push(batchData);
-
+  
     // Reset FFmpeg instance
-
     ffmpegLoaded = false;
-
     ffmpeg = null;
     console.log("FFmpeg exited after batch", batchIndex + 1);
-
     await initFFmpeg();
     batchIndex++;
   }
+  
+  // Add final concat logic to scripts
+  psScriptLines.push('\n@"\n' + fileListLines.join('\n') + '\n"@ | Out-File -Encoding ASCII list.txt');
+  psScriptLines.push('ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4\n');
+  
+  bashScriptLines.push('cat << EOF > list.txt\n' + fileListLines.join('\n') + '\nEOF');
+  bashScriptLines.push('ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4');
+  
+  // Output to textareas
+  document.getElementById("psScript").value = psScriptLines.join('\n');
+  document.getElementById("bashScript").value = bashScriptLines.join('\n');
+  
 
   // Save the buffers for further use (merge all batches, etc.)
   window.processedBatches = fullOutputBuffers;
@@ -933,7 +956,8 @@ async function mergeAllBatches() {
     '-c', 'copy',
     'final_merged.mp4'
   ];
-
+  console.log(args);
+  
   await ffmpegMerge.exec(args);
 
   // Read final merged output
@@ -998,3 +1022,35 @@ function scroll(duration) {
 
   requestAnimationFrame(step);
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const copyBtnBASH = document.getElementById('copyBtnBASH');
+  const copyBtnPS = document.getElementById('copyBtnPS');
+  const psScript = document.getElementById('psScript');
+  const bashScript = document.getElementById('bashScript');
+
+
+  copyBtnPS.addEventListener('click', async () => {
+    try {
+      copyBtnPS.style.backgroundColor = '#2ecc71'
+      copyBtnPS.innerText = 'Copied PowerShell!'
+      await navigator.clipboard.writeText(psScript.value);
+      //alert('PowerShell script copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      alert('Failed to copy script. Your browser may not support clipboard access.');
+    }
+  });
+
+  copyBtnBASH.addEventListener('click', async () => {
+    try {
+      copyBtnBASH.style.backgroundColor = '#2ecc71'
+      copyBtnBASH.innerText = "Copied Bash!"
+      await navigator.clipboard.writeText(bashScript.value);
+      //alert('bash script copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy:', err);
+      alert('Failed to copy script. Your browser may not support clipboard access.');
+    }
+  });
+});

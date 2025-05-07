@@ -84,8 +84,10 @@
 <button id="downloadVideoBtn" class="download-btn">Download Video</button>
 
 <!-- Processing Indicator -->
-<div id="processingIndicator" style="display:none;">Processing, please wait...</div>
-
+<textarea id="psScript" readonly></textarea>
+<textarea id="bashScript" readonly></textarea>
+<button id="copyBtnPS">Copy PowerShell script</button>
+<button id="copyBtnBASH">Copy Bash script</button>
 <!-- Script dependencies -->
 <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
 <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
