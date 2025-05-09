@@ -1,0 +1,50 @@
+pipeline {
+    agent any
+    environment {
+        IMAGE_NAME = "silence-remover"
+        CONTAINER_NAME = "silence-remover"
+        WORKDIR = "/workspace"
+    }
+    stages {
+        stage('Checkout') {
+            steps {
+                // No git checkout needed if code is already mounted via /workspace
+                echo "Using mounted source at ${WORKDIR}"
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                cd $WORKDIR
+                docker build -t $IMAGE_NAME .
+                '''
+            }
+        }
+        stage('Stop and Remove Old Container') {
+            steps {
+                sh '''
+                docker stop $CONTAINER_NAME || true
+                docker rm $CONTAINER_NAME || true
+                '''
+            }
+        }
+        stage('Run New Container') {
+            steps {
+                sh '''
+                docker run -d \
+                  --name $CONTAINER_NAME \
+                  -p 80:80 \
+                  $IMAGE_NAME
+                '''
+            }
+        }
+    }
+    post {
+        failure {
+            echo '❌ Deployment failed.'
+        }
+        success {
+            echo '✅ Deployment complete. App should be live on port 80.'
+        }
+    }
+}
