@@ -517,7 +517,6 @@ function applyShrinkFilter(shrinkMs, minRegionDuration) {
     silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
   }
   console.log(silentRegions);
-  
 }
 
 function enforceMinRegionDuration(regions, minDuration) {
