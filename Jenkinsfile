@@ -3,14 +3,18 @@ pipeline {
     environment {
         IMAGE_NAME = "silence-remover"
         CONTAINER_NAME = "silence-remover"
-        APP_PATH = "/workspace/silence-remover"
     }
     stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
         stage('Build Docker Image') {
             steps {
-                sh '''
-                    docker build -t $IMAGE_NAME $APP_PATH
-                '''
+                dir('silence-remover') {
+                    sh 'docker build -t $IMAGE_NAME .'
+                }
             }
         }
         stage('Stop & Remove Old Container') {
@@ -23,9 +27,7 @@ pipeline {
         }
         stage('Run New Container') {
             steps {
-                sh '''
-                    docker run -d --name $CONTAINER_NAME -p 80:80 $IMAGE_NAME
-                '''
+                sh 'docker run -d --name $CONTAINER_NAME -p 80:80 $IMAGE_NAME'
             }
         }
     }
