@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   jenkins:
     build: .
@@ -11,8 +9,5 @@ services:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
       - ../silence-remover:/workspace
-    environment:
-      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
-
 volumes:
   jenkins_home:
