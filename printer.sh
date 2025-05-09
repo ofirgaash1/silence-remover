@@ -1,4 +1,3 @@
-ofir@ofir-Latitude-7420:~$ cat printer
 #!/bin/bash
 
 # Check if directory is provided
