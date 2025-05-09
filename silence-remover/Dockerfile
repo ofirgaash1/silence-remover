@@ -17,6 +17,7 @@ RUN rm -rf /usr/share/nginx/html/*
 
 # Copy the built files from previous stage
 COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Expose port and start
 EXPOSE 80
