@@ -39,8 +39,8 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
-                    echo "Bringing up containers..."
-                    docker compose -f docker-compose.prod.yml up -d
+                    echo "Bringing up only silence-remover (Nginx) container..."
+                    docker compose -f docker-compose.prod.yml up -d silence-remover
                 '''
             }
         }
