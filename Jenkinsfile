@@ -6,20 +6,21 @@ pipeline {
                 checkout scm
             }
         }
-        stage('Clean Previous Containers') {
+
+        stage('Clean up old containers (optional)') {
             steps {
                 sh '''
-                    echo "Stopping and removing existing containers if needed..."
                     docker compose -f docker-compose.prod.yml down || true
-                    docker rm -f silence-remover || true
-                    docker rm -f certbot || true
+                    docker container prune -f || true
                 '''
             }
         }
-        stage('Deploy') {
+
+        stage('Build and Deploy') {
             steps {
                 sh '''
-                    docker compose -f docker-compose.prod.yml up -d --build
+                    docker compose -f docker-compose.prod.yml build --no-cache
+                    docker compose -f docker-compose.prod.yml up -d
                 '''
             }
         }
