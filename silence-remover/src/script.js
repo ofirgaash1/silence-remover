@@ -421,8 +421,6 @@ function computePeaks(buffer) {
   const sampleRate = buffer.sampleRate;
   const peaks = [];
   const numberOfPeaks = 250 * Math.floor(audioBuffer.duration); // desired peaks per second * number of seconds
-  console.log("@@@@@@@@@@@@@");
-  console.log(numberOfPeaks);
   
   
 
@@ -516,7 +514,6 @@ function applyShrinkFilter(shrinkMs, minRegionDuration) {
   if (silentRegions.some(r => (r.end - r.start) < minRegionDuration)) {
     silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
   }
-  console.log(silentRegions);
 }
 
 function enforceMinRegionDuration(regions, minDuration) {
@@ -841,7 +838,6 @@ async function cutVideo() {
   }
 
   const nonSilentRegions = calculateNonSilentRanges();
-  console.log("Calculated non-silent regions:", nonSilentRegions);
 
   if (nonSilentRegions.length === 0) {
     alert("No silence detected — full video kept!");
@@ -863,7 +859,6 @@ async function cutVideo() {
   }
 
   if (!ffmpegLoaded) {
-    console.log("Loading FFmpeg...");
     await initFFmpeg();
   }
 
@@ -914,7 +909,6 @@ async function cutVideo() {
         outputName
       ];
 
-      console.log(args);
       await ffmpeg.exec(args);
 
       // Add to PowerShell and Bash script lines
@@ -993,7 +987,6 @@ async function mergeAllBatches() {
     '-c', 'copy',
     'final_merged.mp4'
   ];
-  console.log(args);
 
   await ffmpegMerge.exec(args);
 
