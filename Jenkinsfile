@@ -38,11 +38,12 @@ pipeline {
             steps {
                 sh '''
                     docker run --rm \
-                      -v silence-remover_certbot-etc:/etc/letsencrypt \
-                      -v silence-remover_certbot-var:/var/lib/letsencrypt \
-                      certbot/certbot certonly \
-                      --webroot -w /var/lib/letsencrypt \
-                      -d silence-remover.com -d www.silence-remover.com
+                    -v silence-remover_certbot-etc:/etc/letsencrypt \
+                    -v silence-remover_certbot-var:/var/lib/letsencrypt \
+                    certbot/certbot certonly \
+                    --webroot -w /var/lib/letsencrypt \
+                    -d silence-remover.com -d www.silence-remover.com \
+                    --non-interactive --agree-tos --email ofirgaash@gmail.com
                 '''
             }
         }
