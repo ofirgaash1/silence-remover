@@ -29,4 +29,10 @@ RUN curl -fsSL https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_li
     mv terraform /usr/local/bin/ && \
     rm terraform.zip
 
+# Install Docker Compose plugin (modern 'docker compose' CLI)
+RUN mkdir -p ~/.docker/cli-plugins && \
+    curl -SL https://github.com/docker/compose/releases/download/v2.24.2/docker-compose-linux-x86_64 \
+        -o /usr/local/lib/docker/cli-plugins/docker-compose && \
+    chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
 USER jenkins
