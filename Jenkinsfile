@@ -23,17 +23,14 @@ pipeline {
             }
         }
 
-        stage('Pre-clean containers and ports') {
+        stage('Pre-clean containers and networks') {
             steps {
                 sh '''
-                    echo "Stopping existing containers if needed..."
+                    echo "Stopping and removing known containers..."
                     docker stop certbot || true
                     docker rm certbot || true
                     docker stop silence-remover || true
                     docker rm silence-remover || true
-
-                    echo "Killing anything listening on port 80..."
-                    PID=$(lsof -t -i:80) && [ -n "$PID" ] && kill -9 $PID || true
 
                     echo "Pruning unused containers and networks..."
                     docker container prune -f || true
