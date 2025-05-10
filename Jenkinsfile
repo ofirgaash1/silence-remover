@@ -8,19 +8,38 @@ pipeline {
             }
         }
 
-        stage('Clean up old containers') {
+        stage('Pre-clean containers and ports') {
             steps {
                 sh '''
-                    docker compose -f docker-compose.prod.yml down || true
+                    echo "Stopping existing containers if needed..."
+                    docker stop certbot || true
+                    docker rm certbot || true
+                    docker stop silence-remover || true
+                    docker rm silence-remover || true
+
+                    echo "Killing anything listening on port 80..."
+                    PID=$(sudo lsof -t -i:80) && [ -n "$PID" ] && sudo kill -9 $PID || true
+
+                    echo "Pruning dangling containers and networks..."
                     docker container prune -f || true
+                    docker network prune -f || true
                 '''
             }
         }
 
-        stage('Build and Deploy') {
+        stage('Build') {
             steps {
                 sh '''
+                    echo "Building fresh images..."
                     docker compose -f docker-compose.prod.yml build --no-cache
+                '''
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                sh '''
+                    echo "Bringing up containers..."
                     docker compose -f docker-compose.prod.yml up -d
                 '''
             }
