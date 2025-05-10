@@ -18,9 +18,9 @@ pipeline {
                     docker rm silence-remover || true
 
                     echo "Killing anything listening on port 80..."
-                    PID=$(sudo lsof -t -i:80) && [ -n "$PID" ] && sudo kill -9 $PID || true
+                    PID=$(lsof -t -i:80) && [ -n "$PID" ] && kill -9 $PID || true
 
-                    echo "Pruning dangling containers and networks..."
+                    echo "Pruning unused containers and networks..."
                     docker container prune -f || true
                     docker network prune -f || true
                 '''
@@ -30,8 +30,8 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
-                    echo "Building fresh images..."
-                    docker compose -f docker-compose.prod.yml build
+                    echo "Building fresh Docker images..."
+                    docker compose -f docker-compose.prod.yml build --no-cache
                 '''
             }
         }
@@ -39,8 +39,8 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
-                    echo "Bringing up only silence-remover (Nginx) container..."
-                    docker compose -f docker-compose.prod.yml up -d silence-remover
+                    echo "Starting only the web (Nginx) service..."
+                    docker compose -f docker-compose.prod.yml up -d web
                 '''
             }
         }
