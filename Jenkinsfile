@@ -8,6 +8,21 @@ pipeline {
             }
         }
 
+        stage('Free port 80') {
+            steps {
+                sh '''
+                    echo "Checking for containers using port 80..."
+                    PORT_80_CONTAINERS=$(docker ps --format '{{.ID}} {{.Ports}}' | grep ':80->' | awk '{print $1}')
+                    if [ ! -z "$PORT_80_CONTAINERS" ]; then
+                        echo "Stopping containers using port 80: $PORT_80_CONTAINERS"
+                        docker stop $PORT_80_CONTAINERS || true
+                    else
+                        echo "No container is using port 80."
+                    fi
+                '''
+            }
+        }
+
         stage('Pre-clean containers and ports') {
             steps {
                 sh '''
