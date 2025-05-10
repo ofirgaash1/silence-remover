@@ -28,7 +28,3 @@ services:
 volumes:
   certbot-etc:
   certbot-var:
-
-
-
-
