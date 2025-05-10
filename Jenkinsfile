@@ -31,7 +31,7 @@ pipeline {
             steps {
                 sh '''
                     echo "Building fresh images..."
-                    docker compose -f docker-compose.prod.yml build --no-cache
+                    docker compose -f docker-compose.prod.yml build
                 '''
             }
         }
