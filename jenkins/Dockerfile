@@ -6,10 +6,8 @@ USER root
 RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-venv \
-    awscli \
     unzip \
     docker.io \
-    ansible \
     curl \
     git \
     sudo \
