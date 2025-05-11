@@ -140,6 +140,76 @@ function setupUIEvents() {
   cutVideoBtn.addEventListener('click', cutVideo);
 }
 
+function handleFile(file) {
+  if (!file) return;
+
+  resetState(file);
+  setupWaveSurfer();
+
+  const wave = document.querySelector('#waveform wave');
+  setupZoomControls();
+  setupDragScrolling(wave);
+  setupWheelScrolling(wave);
+
+  readAndDecodeAudio(file);
+}
+
+function readAndDecodeAudio(file) {
+  const reader = new FileReader();
+
+  reader.onprogress = onFileProgress;
+  reader.onloadstart = () => title.innerText = "Starting file load...";
+  reader.onerror = () => console.error("FileReader error:", reader.error);
+  reader.onabort = () => console.warn("File reading aborted");
+
+  reader.onload = async e => {
+    try {
+      const ctx = new AudioContext();
+      audioBuffer = await ctx.decodeAudioData(e.target.result);
+      normalizeAudioBuffer(audioBuffer);
+      precomputedPeaks = computePeaks(audioBuffer);
+      autoAdjustThresholdSlider();
+      handleThresholdChange();
+      drawRegions();
+      wavesurfer.loadDecodedBuffer(audioBuffer);
+      title.innerText = "Tweak the sliders!";
+    } catch (err) {
+      console.error("Processing error:", err);
+      title.innerText = `Processing error: ${err}`;
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
+function readAndDecodeAudio(file) {
+  const reader = new FileReader();
+
+  reader.onprogress = onFileProgress;
+  reader.onloadstart = () => title.innerText = "Starting file load...";
+  reader.onerror = () => console.error("FileReader error:", reader.error);
+  reader.onabort = () => console.warn("File reading aborted");
+
+  reader.onload = async e => {
+    try {
+      const ctx = new AudioContext();
+      audioBuffer = await ctx.decodeAudioData(e.target.result);
+      normalizeAudioBuffer(audioBuffer);
+      precomputedPeaks = computePeaks(audioBuffer);
+      autoAdjustThresholdSlider();
+      handleThresholdChange();
+      drawRegions();
+      wavesurfer.loadDecodedBuffer(audioBuffer);
+      title.innerText = "Tweak the sliders!";
+    } catch (err) {
+      console.error("Processing error:", err);
+      title.innerText = `Processing error: ${err}`;
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+}
+
 function normalizeAudioBuffer(buffer) {
 
   const data = buffer.getChannelData(0);
@@ -157,11 +227,7 @@ function normalizeAudioBuffer(buffer) {
   }
 }
 
-
-
-function handleFile(file) {
-  if (!file) return;
-
+function resetState(file) {
   console.log(`Starting file processing for: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
 
   uploadedFile = file;
@@ -171,11 +237,12 @@ function handleFile(file) {
   lastBlob = null;
   audioPreview.src = '';
   videoPreview.src = '';
-
   dropZone.style.display = 'none';
   waveformDiv.style.display = 'block';
+}
 
-  updateThresholdLine(); // Ensure line is placed immediately
+function setupWaveSurfer() {
+  updateThresholdLine();
 
   wavesurfer = WaveSurfer.create({
     container: waveformDiv,
@@ -185,234 +252,34 @@ function handleFile(file) {
     waveColor: 'blue',
     progressColor: 'blue',
     backend: 'WebAudio',
-    autoCenter: false, // may not do anything alone
+    autoCenter: false,
     plugins: [WaveSurfer.regions.create({})]
   });
 
   wavesurfer.on('ready', () => {
-    // Prevent zoom from auto-scrolling to playhead
-    wavesurfer.drawer.recenter = () => { };
+    wavesurfer.drawer.recenter = () => {};
   });
 
+  title.innerText = wavesurfer.params.minPxPerSec;
+}
 
-
-  title.innerText = wavesurfer.params.minPxPerSec
-
-
-  const wave = document.querySelector('#waveform wave');
-
-  // === CONFIGURABLE PARAMETERS ===
-  const WHEEL_SENSITIVITY = 1 / 8;         // scale wheel input
-  const WHEEL_ACCELERATION = 0.15;          // how quickly velocity ramps up
-  const WHEEL_DECELERATION = 0.9;         // how slowly it slows down
-  const WHEEL_IDLE_TIMEOUT = 100;          // ms to wait before deceleration starts
-
-  const DRAG_DECELERATION = 0.95;          // how slowly drag decays
-  const DRAG_STOP_THRESHOLD = 0.001;         // min velocity before stopping
-  const WHEEL_STOP_THRESHOLD = 0.001;        // min velocity before stopping
-
-
-  let latestZoomValue = 50; // default zoom value
-  let zoomTimeout = null;
-
+function setupZoomControls() {
   zoomSlider.addEventListener('input', (e) => {
     zoomInput.value = (e.target.value * 100 / 8).toFixed(2);
     clearTimeout(zoomTimeout);
     latestZoomValue = e.target.valueAsNumber;
-
-    // Debounce zoom: wait until user stops sliding
-    zoomTimeout = setTimeout(() => {
-      applyZoom(latestZoomValue);
-    }, 1); // Increase for performance if needed
+    zoomTimeout = setTimeout(() => applyZoom(latestZoomValue), 1);
   });
+}
 
-  function applyZoom(zoomValue) {
-    const scrollEl = wave; // Your scrollable container
-    const duration = audioBuffer?.duration || wavesurfer.getDuration() || 1;
-    const containerWidth = scrollEl.clientWidth;
+function setupDragScrolling(wave) {
+  wave.addEventListener('mousedown', onMouseDown);
+  wave.addEventListener('mousemove', onMouseMove);
+  ['mouseup', 'mouseleave'].forEach(evt => wave.addEventListener(evt, onMouseUp));
+}
 
-    const currentPxPerSec =
-      wavesurfer.params.minPxPerSec || scrollEl.scrollWidth / duration;
-
-    const scrollLeft = scrollEl.scrollLeft;
-    const centerPx = scrollLeft + containerWidth / 2;
-    const centerTime = centerPx / currentPxPerSec;
-
-    const newPxPerSec = (containerWidth / duration) + zoomValue ** 2;
-
-    if (wavesurfer) {
-      wavesurfer.zoom(newPxPerSec);
-
-      // Now safe to apply scroll immediately — no more zoom "fighting"
-      const newCenterPx = centerTime * newPxPerSec;
-      scrollEl.scrollLeft = newCenterPx - containerWidth / 2;
-    }
-
-    title.innerText = "Click and drag the waveform, or use the scroll wheel over it";
-  }
-
-
-
-
-  // === DRAG STATE ===
-  let isDown = false;
-  let startX = 0;
-  let startScroll = 0;
-  let dragVelocity = 0;
-  let lastX = 0;
-  let dragMomentumId = null;
-
-  // === WHEEL STATE ===
-  let wheelVelocity = 0;
-  let targetWheelVelocity = 0;
-  let wheelMomentumId = null;
-  let wheelTimeout = null;
-
-  // === DRAG EVENTS ===
-  wave.addEventListener('mousedown', e => {
-    isDown = true;
-    startX = e.pageX - wave.offsetLeft;
-    startScroll = wave.scrollLeft;
-    lastX = startX;
-    cancelAnimationFrame(dragMomentumId);
-    wave.classList.add('dragging');
-    e.preventDefault();
-  });
-
-  wave.addEventListener('mousemove', e => {
-    if (!isDown) return;
-    const x = e.pageX - wave.offsetLeft;
-    const delta = x - startX;
-    dragVelocity = x - lastX;
-    lastX = x;
-    wave.scrollLeft = startScroll - delta;
-  });
-
-  ['mouseup', 'mouseleave'].forEach(evt =>
-    wave.addEventListener(evt, () => {
-      if (!isDown) return;
-      isDown = false;
-      wave.classList.remove('dragging');
-      dragMomentum();
-    })
-  );
-
-  // === DRAG INERTIA ===
-  function dragMomentum() {
-    if (Math.abs(dragVelocity) < DRAG_STOP_THRESHOLD) return;
-    wave.scrollLeft -= dragVelocity;
-    dragVelocity *= DRAG_DECELERATION;
-    dragMomentumId = requestAnimationFrame(dragMomentum);
-  }
-
-  // === WHEEL EVENTS ===
-  wave.addEventListener('wheel', e => {
-    e.preventDefault();
-
-    const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
-    targetWheelVelocity += scaledDelta;
-
-    clearTimeout(wheelTimeout);
-    if (!wheelMomentumId) {
-      wheelMomentum(); // begin loop if not running
-    }
-
-    wheelTimeout = setTimeout(() => {
-      targetWheelVelocity = 0;
-    }, WHEEL_IDLE_TIMEOUT);
-  }, { passive: false });
-
-  function wheelMomentum() {
-    if (targetWheelVelocity !== 0) {
-      // While user is still interacting: ease toward target
-      wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
-    } else {
-      // After input stops: decelerate gradually
-      wheelVelocity *= WHEEL_DECELERATION;
-    }
-
-    // Apply scroll
-    wave.scrollLeft += wheelVelocity;
-
-    // Continue if still moving
-    if (Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD || Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD) {
-      wheelMomentumId = requestAnimationFrame(wheelMomentum);
-    } else {
-      wheelVelocity = 0;
-      targetWheelVelocity = 0;
-      wheelMomentumId = null;
-    }
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  const reader = new FileReader();
-
-  // Add progress event listener
-  reader.onprogress = (e) => {
-    if (e.lengthComputable) {
-      const percentLoaded = Math.round((e.loaded / e.total) * 100);
-      title.innerText = `Loading file... ${percentLoaded}%`;
-    }
-  };
-
-  reader.onloadstart = () => {
-    console.log("File reading started");
-    title.innerText = "Starting file load...";
-  };
-  reader.onload = async e => {
-    console.log("File fully loaded into memory");
-    title.innerText = "Tweak the sliders!"
-    try {
-      const arrayBuffer = e.target.result;
-      const ctx = new AudioContext();
-      title.innerText = "Decoding audio... (Takes a few seconds)";
-      audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-      title.innerText = "Audio decoded, normalizing...";
-      normalizeAudioBuffer(audioBuffer);
-      precomputedPeaks = computePeaks(audioBuffer);
-      autoAdjustThresholdSlider()
-      console.log("Processing regions...");
-      handleThresholdChange();
-      drawRegions();
-
-      console.log("Loading waveform...");
-      wavesurfer.loadDecodedBuffer(audioBuffer);
-
-      console.log("File processing complete");
-    } catch (err) {
-      console.error("Processing error:", err);
-      title.innerText = `Processing error: ${err}. Try to play your file first. Maybe it doesn't have audio.`
-
-    }
-  };
-
-  reader.onerror = () => {
-    console.error("FileReader error:", reader.error);
-  };
-
-  reader.onabort = () => {
-    console.warn("File reading aborted");
-  };
-
-  console.log("Starting readAsArrayBuffer...");
-  reader.readAsArrayBuffer(file);
-  console.log("readAsArrayBuffer called (this doesn't mean loading is complete)");
+function setupWheelScrolling(wave) {
+  wave.addEventListener('wheel', onWheelScroll, { passive: false });
 }
 
 function computePeaks(buffer) {
@@ -541,8 +408,6 @@ function enforceMinRegionDuration(regions, minDuration) {
 
   return merged;
 }
-
-
 
 function markSilentRegions() {
   const raw = +thresholdSlider.value / 100;
