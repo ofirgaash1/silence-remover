@@ -812,143 +812,39 @@ function calculateNonSilentRanges() {
   return regions;
 }
 
-async function cutVideo() {
-  console.log("🧠 cutVideo() called");
+function updateSegmentUI(region, index, total) {
+  scrollToTimeSmooth(region.start);
+  title.innerText = `Encoding part ${index + 1} of ${total}...`;
 
-  const uploadedFile = window.uploadedFile;
-  console.log("📦 typeof uploadedFile:", typeof uploadedFile);
-  console.log("📦 uploadedFile:", uploadedFile);
+  wavesurfer.addRegion({
+    start: region.start,
+    end: region.end,
+    color: "rgba(0, 255, 0, 0.7)",
+    drag: false,
+    resize: false,
+  });
+}
 
-  if (!uploadedFile) {
-    console.warn("❌ No uploaded file — exiting early.");
-    return;
-  }
+function addFFmpegCommandScripts(
+  start,
+  duration,
+  outputName,
+  psScriptLines,
+  bashScriptLines,
+  fileListLines
+) {
+  const ffmpegCommand = `ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`;
 
-  const nonSilentRegions = calculateNonSilentRanges();
-  console.log("📏 nonSilentRegions:", nonSilentRegions);
+  psScriptLines.push(ffmpegCommand);
+  bashScriptLines.push(ffmpegCommand);
+  fileListLines.push(`file '${outputName}'`);
+}
 
-  if (!nonSilentRegions?.length) {
-    alert("No silence detected — full video kept!");
-    return;
-  }
-
-  const BATCH_SIZE = 30;
-  let batchIndex = 0;
-  const fullOutputBuffers = [];
-
-  async function initFFmpeg() {
-    const { createFFmpeg, fetchFile: ffetch } = window.FFmpegLib;
-    ffmpeg = createFFmpeg({ log: true });
-    await ffmpeg.load({
-      classWorkerURL: new URL("/worker/worker.mjs", window.location.origin)
-        .href,
-      workerOptions: { type: "module" },
-    });
-    ffmpegLoaded = true;
-  }
-
-  if (!ffmpegLoaded) {
-    await initFFmpeg();
-  }
-
-  let totalParts = nonSilentRegions.length;
-  let allSegmentFileNames = [];
-  let psScriptLines = [];
-  let bashScriptLines = [];
-  let fileListLines = [];
-
-  for (
-    let batchStart = 0;
-    batchStart < nonSilentRegions.length;
-    batchStart += BATCH_SIZE
-  ) {
-    const batchRegions = nonSilentRegions.slice(
-      batchStart,
-      batchStart + BATCH_SIZE
-    );
-    const segmentFileNames = [];
-    console.log(`--- Processing batch ${batchIndex + 1} ---`);
-
-    // Write input file again (after first batch or restart)
-    await ffmpeg.writeFile("input.mp4", await fetchFile(uploadedFile));
-    for (let i = 0; i < batchRegions.length; i++) {
-      const region = batchRegions[i];
-      const segmentIndex = batchStart + i;
-      const outputName = `part${segmentIndex}.mp4`;
-      segmentFileNames.push(outputName);
-      allSegmentFileNames.push(outputName);
-
-      scrollToTimeSmooth(region.start);
-      title.innerText = `Encoding part ${segmentIndex + 1} of ${totalParts}...`;
-      wavesurfer.addRegion({
-        start: region.start,
-        end: region.end,
-        color: "rgba(0, 255, 0, 0.7)",
-        drag: false,
-        resize: false,
-      });
-
-      const args = [
-        "-ss",
-        region.start.toFixed(6),
-        "-i",
-        "input.mp4",
-        "-to",
-        (region.end - region.start).toFixed(6),
-        "-c:v",
-        "libx264",
-        "-crf",
-        "20",
-        "-preset",
-        "ultrafast",
-        "-profile:v",
-        "high",
-        "-pix_fmt",
-        "yuv420p",
-        "-movflags",
-        "+faststart",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "128k",
-        "-threads",
-        "0",
-        "-avoid_negative_ts",
-        "1",
-        outputName,
-      ];
-
-      await ffmpeg.exec(args);
-
-      // Add to PowerShell and Bash script lines
-      const start = region.start.toFixed(6);
-      const duration = (region.end - region.start).toFixed(6);
-      psScriptLines.push(
-        `ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`
-      );
-      bashScriptLines.push(
-        `ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`
-      );
-      fileListLines.push(`file '${outputName}'`);
-    }
-
-    // Concatenate this batch (optional)
-    const batchOutputName = `final_batch_${batchIndex}.mp4`;
-    await concatSegments(segmentFileNames, batchOutputName);
-
-    // Read result to memory
-    const batchData = await ffmpeg.readFile(batchOutputName);
-    fullOutputBuffers.push(batchData);
-
-    // Reset FFmpeg instance
-    ffmpegLoaded = false;
-    ffmpeg = null;
-    console.log("FFmpeg exited after batch", batchIndex + 1);
-    await initFFmpeg();
-    batchIndex++;
-  }
-
-  // Add final concat logic to scripts
+function outputConcatScriptsToUI(
+  psScriptLines,
+  bashScriptLines,
+  fileListLines
+) {
   psScriptLines.push(
     '\n@"\n' +
       fileListLines.join("\n") +
@@ -965,34 +861,21 @@ async function cutVideo() {
     "ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4"
   );
 
-  // Output to textareas
   document.getElementById("psScript").value = psScriptLines.join("\n");
   document.getElementById("bashScript").value = bashScriptLines.join("\n");
-
-  // Save the buffers for further use (merge all batches, etc.)
-  window.processedBatches = fullOutputBuffers;
-
-  await mergeAllBatches();
 }
 
-async function mergeAllBatches() {
-  if (!window.processedBatches || window.processedBatches.length === 0) {
-    alert("No batches to merge. Run cutVideo() first.");
-    return;
-  }
-
-  console.log("Merging all processed batches...");
-
-  // Initialize FFmpeg
+async function mergeProcessedBatchesWithFFmpegWASM() {
   const { createFFmpeg } = window.FFmpegLib;
   const ffmpegMerge = createFFmpeg({ log: true });
+
   await ffmpegMerge.load({
     classWorkerURL: new URL("/worker/worker.mjs", window.location.origin).href,
     workerOptions: { type: "module" },
   });
 
-  // Write all batch files and create list.txt
   const listLines = [];
+
   for (let i = 0; i < window.processedBatches.length; i++) {
     const filename = `final_batch_${i}.mp4`;
     await ffmpegMerge.writeFile(filename, window.processedBatches[i]);
@@ -1001,7 +884,6 @@ async function mergeAllBatches() {
 
   await ffmpegMerge.writeFile("list.txt", listLines.join("\n"));
 
-  // Concatenate batches
   const args = [
     "-f",
     "concat",
@@ -1016,28 +898,200 @@ async function mergeAllBatches() {
 
   await ffmpegMerge.exec(args);
 
-  // Read final merged output
   const finalData = await ffmpegMerge.readFile("final_merged.mp4");
-  const blob = new Blob([finalData.buffer], { type: "video/mp4" });
-  const url = URL.createObjectURL(blob);
+  return new Blob([finalData.buffer], { type: "video/mp4" });
+}
 
-  // Display or download
+function displayMergedVideo(blob) {
+  const url = URL.createObjectURL(blob);
   const videoPreview = document.querySelector("#videoPreview");
-  title.innerText = "Done! Consider donating â¤";
 
   videoPreview.src = url;
   videoPreview.style.display = "inline-block";
   downloadVideoBtn.style.display = "inline-block";
   copyBtnBASH.style.display = "inline-block";
   copyBtnPS.style.display = "inline-block";
+
+  title.innerText = "Done! Consider donating ❤️";
+
   downloadVideoBtn.onclick = () => {
     const a = document.createElement("a");
     a.href = url;
     a.download = "final_merged.mp4";
     a.click();
   };
+
   scrollToBottomWithDelay();
   console.log("Final video merged and loaded.");
+}
+
+async function cutVideo() {
+  console.log("🧠 cutVideo() called");
+
+  const uploadedFile = window.uploadedFile;
+  if (!uploadedFile) {
+    console.warn("❌ No uploaded file — exiting early.");
+    return;
+  }
+
+  const nonSilentRegions = calculateNonSilentRanges();
+  if (!nonSilentRegions?.length) {
+    alert("No silence detected — full video kept!");
+    return;
+  }
+
+  const isElectron = typeof window.ElectronAPI?.cutOneSegment === "function";
+  const totalParts = nonSilentRegions.length;
+
+  const psScriptLines = [];
+  const bashScriptLines = [];
+  const fileListLines = [];
+  const allSegmentFileNames = [];
+
+  if (isElectron) {
+    console.log("⚡ Detected Electron — using native FFmpeg");
+
+    const uploadedFileSerialized = {
+      name: uploadedFile.name,
+      type: uploadedFile.type,
+      buffer: await uploadedFile.arrayBuffer(),
+    };
+
+    for (let i = 0; i < totalParts; i++) {
+      const region = nonSilentRegions[i];
+      const outputName = `part${i}.mp4`;
+      const start = region.start.toFixed(6);
+      const duration = (region.end - region.start).toFixed(6);
+
+      allSegmentFileNames.push(outputName);
+      updateSegmentUI(region, i, totalParts);
+      addFFmpegCommandScripts(
+        start,
+        duration,
+        outputName,
+        psScriptLines,
+        bashScriptLines,
+        fileListLines
+      );
+
+      await window.ElectronAPI.cutOneSegment(uploadedFileSerialized, {
+        start: region.start,
+        end: region.end,
+        outputName,
+      });
+    }
+
+    await window.ElectronAPI.runMergeAndClean(allSegmentFileNames);
+    console.log("✅ Native Electron processing complete.");
+  } else {
+    console.log("🌐 Detected Web — using ffmpeg.wasm");
+
+    const BATCH_SIZE = 30;
+    let ffmpegLoaded = false;
+    let fullOutputBuffers = [];
+
+    async function initFFmpeg() {
+      const { createFFmpeg } = window.FFmpegLib;
+      ffmpeg = createFFmpeg({ log: true });
+      await ffmpeg.load({
+        classWorkerURL: new URL("/worker/worker.mjs", window.location.origin)
+          .href,
+        workerOptions: { type: "module" },
+      });
+      ffmpegLoaded = true;
+    }
+
+    if (!ffmpegLoaded) {
+      await initFFmpeg();
+    }
+
+    for (
+      let batchStart = 0;
+      batchStart < totalParts;
+      batchStart += BATCH_SIZE
+    ) {
+      const batch = nonSilentRegions.slice(batchStart, batchStart + BATCH_SIZE);
+      const segmentFileNames = [];
+
+      await ffmpeg.writeFile("input.mp4", await fetchFile(uploadedFile));
+
+      for (let i = 0; i < batch.length; i++) {
+        const index = batchStart + i;
+        const region = batch[i];
+        const outputName = `part${index}.mp4`;
+        const start = region.start.toFixed(6);
+        const duration = (region.end - region.start).toFixed(6);
+
+        allSegmentFileNames.push(outputName);
+        segmentFileNames.push(outputName);
+
+        updateSegmentUI(region, index, totalParts);
+        addFFmpegCommandScripts(
+          start,
+          duration,
+          outputName,
+          psScriptLines,
+          bashScriptLines,
+          fileListLines
+        );
+
+        const args = [
+          "-ss",
+          start,
+          "-i",
+          "input.mp4",
+          "-to",
+          duration,
+          "-c:v",
+          "libx264",
+          "-crf",
+          "20",
+          "-preset",
+          "ultrafast",
+          "-profile:v",
+          "high",
+          "-pix_fmt",
+          "yuv420p",
+          "-movflags",
+          "+faststart",
+          "-c:a",
+          "aac",
+          "-b:a",
+          "128k",
+          "-threads",
+          "0",
+          "-avoid_negative_ts",
+          "1",
+          outputName,
+        ];
+
+        await ffmpeg.exec(args);
+      }
+
+      await concatSegments(
+        segmentFileNames,
+        `final_batch_${batchStart / BATCH_SIZE}.mp4`
+      );
+      const batchData = await ffmpeg.readFile(
+        `final_batch_${batchStart / BATCH_SIZE}.mp4`
+      );
+      fullOutputBuffers.push(batchData);
+
+      ffmpegLoaded = false;
+      ffmpeg = null;
+      await initFFmpeg();
+    }
+
+    window.processedBatches = fullOutputBuffers;
+
+    const finalBlob = await mergeProcessedBatchesWithFFmpegWASM();
+    displayMergedVideo(finalBlob);
+    console.log("✅ WASM processing complete.");
+  }
+
+  outputConcatScriptsToUI(psScriptLines, bashScriptLines, fileListLines);
+  title.innerText =
+    "✅ Done! You can now concatenate the parts or download scripts.";
 }
 
 async function concatSegments(fileNames, outputFileName = "final.mp4") {
