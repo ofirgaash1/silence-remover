@@ -832,54 +832,35 @@ async function cutVideo() {
     return;
   }
 
-  const BATCH_SIZE = 30;
-  let batchIndex = 0;
-  const fullOutputBuffers = [];
+  const psScriptLines = [];
+  const bashScriptLines = [];
+  const fileListLines = [];
+  const allSegmentFileNames = [];
 
-  async function initFFmpeg() {
-    const { createFFmpeg, fetchFile: ffetch } = window.FFmpegLib;
-    ffmpeg = createFFmpeg({ log: true });
-    await ffmpeg.load({
-      classWorkerURL: new URL("/worker/worker.mjs", window.location.origin)
-        .href,
-      workerOptions: { type: "module" },
-    });
-    ffmpegLoaded = true;
-  }
+  const isElectron = typeof window.ElectronAPI?.cutOneSegment === "function";
+  console.log("🧪 Running in Electron?", isElectron);
 
-  if (!ffmpegLoaded) {
-    await initFFmpeg();
-  }
+  if (isElectron) {
+    console.log("⚡ Detected Electron — using native FFmpeg");
 
-  let totalParts = nonSilentRegions.length;
-  let allSegmentFileNames = [];
-  let psScriptLines = [];
-  let bashScriptLines = [];
-  let fileListLines = [];
+    // Serialize uploadedFile ONCE
+    const uploadedFileSerialized = {
+      name: uploadedFile.name,
+      type: uploadedFile.type,
+      buffer: await uploadedFile.arrayBuffer(),
+    };
+    console.log("📦 uploadedFileSerialized ready");
 
-  for (
-    let batchStart = 0;
-    batchStart < nonSilentRegions.length;
-    batchStart += BATCH_SIZE
-  ) {
-    const batchRegions = nonSilentRegions.slice(
-      batchStart,
-      batchStart + BATCH_SIZE
-    );
-    const segmentFileNames = [];
-    console.log(`--- Processing batch ${batchIndex + 1} ---`);
-
-    // Write input file again (after first batch or restart)
-    await ffmpeg.writeFile("input.mp4", await fetchFile(uploadedFile));
-    for (let i = 0; i < batchRegions.length; i++) {
-      const region = batchRegions[i];
-      const segmentIndex = batchStart + i;
-      const outputName = `part${segmentIndex}.mp4`;
-      segmentFileNames.push(outputName);
+    for (let i = 0; i < nonSilentRegions.length; i++) {
+      const region = nonSilentRegions[i];
+      const outputName = `part${i}.mp4`;
       allSegmentFileNames.push(outputName);
 
       scrollToTimeSmooth(region.start);
-      title.innerText = `Encoding part ${segmentIndex + 1} of ${totalParts}...`;
+      title.innerText = `Encoding part ${i + 1} of ${
+        nonSilentRegions.length
+      }...`;
+
       wavesurfer.addRegion({
         start: region.start,
         end: region.end,
@@ -888,39 +869,6 @@ async function cutVideo() {
         resize: false,
       });
 
-      const args = [
-        "-ss",
-        region.start.toFixed(6),
-        "-i",
-        "input.mp4",
-        "-to",
-        (region.end - region.start).toFixed(6),
-        "-c:v",
-        "libx264",
-        "-crf",
-        "20",
-        "-preset",
-        "ultrafast",
-        "-profile:v",
-        "high",
-        "-pix_fmt",
-        "yuv420p",
-        "-movflags",
-        "+faststart",
-        "-c:a",
-        "aac",
-        "-b:a",
-        "128k",
-        "-threads",
-        "0",
-        "-avoid_negative_ts",
-        "1",
-        outputName,
-      ];
-
-      await ffmpeg.exec(args);
-
-      // Add to PowerShell and Bash script lines
       const start = region.start.toFixed(6);
       const duration = (region.end - region.start).toFixed(6);
       psScriptLines.push(
@@ -930,49 +878,32 @@ async function cutVideo() {
         `ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`
       );
       fileListLines.push(`file '${outputName}'`);
+
+      console.log(`📤 Calling ElectronAPI.cutOneSegment for part ${i}...`);
+      await window.ElectronAPI.cutOneSegment(uploadedFileSerialized, {
+        start: region.start,
+        end: region.end,
+        outputName,
+      });
+      console.log(`✅ Part ${i} done`);
     }
 
-    // Concatenate this batch (optional)
-    const batchOutputName = `final_batch_${batchIndex}.mp4`;
-    await concatSegments(segmentFileNames, batchOutputName);
+    console.log("🔗 Calling ElectronAPI.runMergeAndClean...");
+    await window.ElectronAPI.runMergeAndClean(allSegmentFileNames);
+    console.log("✅ Native Electron processing complete.");
+  } else {
+    console.log("🌐 Detected Web — falling back to browser FFmpeg");
 
-    // Read result to memory
-    const batchData = await ffmpeg.readFile(batchOutputName);
-    fullOutputBuffers.push(batchData);
-
-    // Reset FFmpeg instance
-    ffmpegLoaded = false;
-    ffmpeg = null;
-    console.log("FFmpeg exited after batch", batchIndex + 1);
-    await initFFmpeg();
-    batchIndex++;
+    await cutVideoInBrowser(); // Make sure this exists
+    console.log("✅ Web processing complete.");
   }
 
-  // Add final concat logic to scripts
-  psScriptLines.push(
-    '\n@"\n' +
-      fileListLines.join("\n") +
-      '\n"@ | Out-File -Encoding ASCII list.txt'
-  );
-  psScriptLines.push(
-    "ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4\n"
-  );
-
-  bashScriptLines.push(
-    "cat << EOF > list.txt\n" + fileListLines.join("\n") + "\nEOF"
-  );
-  bashScriptLines.push(
-    "ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4"
-  );
-
-  // Output to textareas
+  // Output the generated scripts to textareas
   document.getElementById("psScript").value = psScriptLines.join("\n");
   document.getElementById("bashScript").value = bashScriptLines.join("\n");
 
-  // Save the buffers for further use (merge all batches, etc.)
-  window.processedBatches = fullOutputBuffers;
-
-  await mergeAllBatches();
+  title.innerText =
+    "✅ Done! You can now concatenate the parts or download scripts.";
 }
 
 async function mergeAllBatches() {
