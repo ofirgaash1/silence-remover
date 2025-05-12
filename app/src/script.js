@@ -1,29 +1,29 @@
-import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/classes.js';
-import './style.css';
+import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/classes.js";
+import "./style.css";
 window.FFmpegLib = {
   createFFmpeg: (options) => new FFmpeg(options),
   fetchFile: async (file) => {
     const buffer = await file.arrayBuffer();
     return new Uint8Array(buffer);
-  }
+  },
 };
 
 // âœ… wait until global libs are defined, then call main()
 
-const delay = (ms) => new Promise(res => setTimeout(res, ms));
+const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
 async function runDelayedMain() {
   await delay(0); // Wait for the next event loop tick (effectively asynchronous)
   await main();
 }
 
-runDelayedMain()
+runDelayedMain();
 
 let wavesurfer = null;
 let audioBuffer = null;
 let silentRegions = [];
 let lastBlob = null;
-let outputFormat = 'mp3';
+let outputFormat = "mp3";
 let precomputedPeaks = [];
 let uploadedFile = null;
 let ffmpeg;
@@ -36,36 +36,32 @@ export async function main() {
   fetchFile = ffetch;
 
   setupUIEvents();
-
 }
 
-const title = document.getElementById('title');
-const dropZone = document.getElementById('drop-zone');
-const waveformDiv = document.getElementById('waveform');
-const browseBtn = document.getElementById('drop-zone');
-const fileInput = document.getElementById('audioFile');
-const thresholdInput = document.getElementById('thresholdInput');
-const shrinkSlider = document.getElementById('shrinkSlider');
-const shrinkInput = document.getElementById('shrinkInput');
-const formatButtons = document.querySelectorAll('.fmt-btn');
-const cutButton = document.getElementById('cutAudio');
-const audioPreview = document.getElementById('audioPreview');
-const downloadBtn = document.getElementById('AudioDownloadBtn');
-const cutVideoBtn = document.getElementById('cutVideoBtn');
-const downloadVideoBtn = document.getElementById('downloadVideoBtn');
-const statsPanel = document.getElementById('statsPanel');
-const vidTitle = document.getElementById('vidTitle');
-const zoomSlider = document.getElementById('zoomSlider');
-const zoomInput = document.getElementById('zoomInput');
+const title = document.getElementById("title");
+const dropZone = document.getElementById("drop-zone");
+const waveformDiv = document.getElementById("waveform");
+const browseBtn = document.getElementById("drop-zone");
+const fileInput = document.getElementById("audioFile");
+const thresholdInput = document.getElementById("thresholdInput");
+const shrinkSlider = document.getElementById("shrinkSlider");
+const shrinkInput = document.getElementById("shrinkInput");
+const formatButtons = document.querySelectorAll(".fmt-btn");
+const cutButton = document.getElementById("cutAudio");
+const audioPreview = document.getElementById("audioPreview");
+const downloadBtn = document.getElementById("AudioDownloadBtn");
+const cutVideoBtn = document.getElementById("cutVideoBtn");
+const downloadVideoBtn = document.getElementById("downloadVideoBtn");
+const statsPanel = document.getElementById("statsPanel");
+const vidTitle = document.getElementById("vidTitle");
+const zoomSlider = document.getElementById("zoomSlider");
+const zoomInput = document.getElementById("zoomInput");
 
-const thresholdSlider = document.getElementById('thresholdSlider');
-const thresholdLine = document.getElementById('thresholdLine');
-const waveform = document.getElementById('waveform');
+const thresholdSlider = document.getElementById("thresholdSlider");
+const thresholdLine = document.getElementById("thresholdLine");
+const waveform = document.getElementById("waveform");
 
-
-
-thresholdSlider.addEventListener('input', updateThresholdLine);
-
+thresholdSlider.addEventListener("input", updateThresholdLine);
 function updateThresholdLine() {
   const raw = parseFloat(thresholdSlider.value) / 100;
   const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
@@ -79,69 +75,70 @@ function updateThresholdLine() {
 }
 
 function setupUIEvents() {
-  vidTitle.style.display = 'none';
-  audioPreview.style.display = 'none';
+  vidTitle.style.display = "none";
+  audioPreview.style.display = "none";
 
-  browseBtn.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+  browseBtn.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", (e) => handleFile(e.target.files[0]));
 
-  dropZone.addEventListener('dragover', e => {
+  dropZone.addEventListener("dragover", (e) => {
     e.preventDefault();
-    dropZone.classList.add('dragover');
+    dropZone.classList.add("dragover");
   });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
-  dropZone.addEventListener('drop', e => {
+  dropZone.addEventListener("dragleave", () =>
+    dropZone.classList.remove("dragover")
+  );
+  dropZone.addEventListener("drop", (e) => {
     e.preventDefault();
-    dropZone.classList.remove('dragover');
+    dropZone.classList.remove("dragover");
     if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
   });
 
-  thresholdSlider.addEventListener('input', e => {
+  thresholdSlider.addEventListener("input", (e) => {
     thresholdInput.value = e.target.value;
     handleThresholdChange();
   });
-  thresholdInput.addEventListener('input', e => {
+  thresholdInput.addEventListener("input", (e) => {
     thresholdSlider.value = e.target.value;
     handleThresholdChange();
   });
 
-  shrinkSlider.addEventListener('input', e => {
+  shrinkSlider.addEventListener("input", (e) => {
     shrinkInput.value = e.target.value;
     handleShrinkChange();
   });
-  shrinkInput.addEventListener('input', e => {
+  shrinkInput.addEventListener("input", (e) => {
     shrinkSlider.value = e.target.value;
     handleShrinkChange();
   });
 
-  formatButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      formatButtons.forEach(b => {
-        b.classList.remove('selected');
+  formatButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      formatButtons.forEach((b) => {
+        b.classList.remove("selected");
         b.innerText = b.dataset.format.toUpperCase();
       });
-      btn.classList.add('selected');
+      btn.classList.add("selected");
       btn.innerText = `${btn.dataset.format.toUpperCase()} âœ“`;
       outputFormat = btn.dataset.format;
     });
   });
 
-  cutButton.addEventListener('click', cutAudio);
-  downloadBtn.addEventListener('click', () => {
+  cutButton.addEventListener("click", cutAudio);
+  downloadBtn.addEventListener("click", () => {
     if (!lastBlob) return;
     const url = URL.createObjectURL(lastBlob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = `edited-audio.${outputFormat}`;
     a.click();
     URL.revokeObjectURL(url);
   });
 
-  cutVideoBtn.addEventListener('click', cutVideo);
+  cutVideoBtn.addEventListener("click", cutVideo);
 }
 
 function normalizeAudioBuffer(buffer) {
-
   const data = buffer.getChannelData(0);
   let max = 0;
   console.log(data.length);
@@ -157,23 +154,21 @@ function normalizeAudioBuffer(buffer) {
   }
 }
 
-
-
 function handleFile(file) {
   if (!file) return;
 
-  console.log(`Starting file processing for: ${file.name} (${(file.size / (1024 * 1024)).toFixed(2)} MB)`);
+  console.log("handleFile() called");
 
-  uploadedFile = file;
+  window.uploadedFile = file;
   if (wavesurfer) wavesurfer.destroy();
   audioBuffer = null;
   silentRegions = [];
   lastBlob = null;
-  audioPreview.src = '';
-  videoPreview.src = '';
+  audioPreview.src = "";
+  videoPreview.src = "";
 
-  dropZone.style.display = 'none';
-  waveformDiv.style.display = 'block';
+  dropZone.style.display = "none";
+  waveformDiv.style.display = "block";
 
   updateThresholdLine(); // Ensure line is placed immediately
 
@@ -182,41 +177,37 @@ function handleFile(file) {
     cursorWidth: 0,
     height: 128,
     scrollParent: false,
-    waveColor: 'blue',
-    progressColor: 'blue',
-    backend: 'WebAudio',
+    waveColor: "blue",
+    progressColor: "blue",
+    backend: "WebAudio",
     autoCenter: false, // may not do anything alone
-    plugins: [WaveSurfer.regions.create({})]
+    plugins: [WaveSurfer.regions.create({})],
   });
 
-  wavesurfer.on('ready', () => {
+  wavesurfer.on("ready", () => {
     // Prevent zoom from auto-scrolling to playhead
-    wavesurfer.drawer.recenter = () => { };
+    wavesurfer.drawer.recenter = () => {};
   });
 
+  title.innerText = wavesurfer.params.minPxPerSec;
 
-
-  title.innerText = wavesurfer.params.minPxPerSec
-
-
-  const wave = document.querySelector('#waveform wave');
+  const wave = document.querySelector("#waveform wave");
 
   // === CONFIGURABLE PARAMETERS ===
-  const WHEEL_SENSITIVITY = 1 / 8;         // scale wheel input
-  const WHEEL_ACCELERATION = 0.15;          // how quickly velocity ramps up
-  const WHEEL_DECELERATION = 0.9;         // how slowly it slows down
-  const WHEEL_IDLE_TIMEOUT = 100;          // ms to wait before deceleration starts
+  const WHEEL_SENSITIVITY = 1 / 8; // scale wheel input
+  const WHEEL_ACCELERATION = 0.15; // how quickly velocity ramps up
+  const WHEEL_DECELERATION = 0.9; // how slowly it slows down
+  const WHEEL_IDLE_TIMEOUT = 100; // ms to wait before deceleration starts
 
-  const DRAG_DECELERATION = 0.95;          // how slowly drag decays
-  const DRAG_STOP_THRESHOLD = 0.001;         // min velocity before stopping
-  const WHEEL_STOP_THRESHOLD = 0.001;        // min velocity before stopping
-
+  const DRAG_DECELERATION = 0.95; // how slowly drag decays
+  const DRAG_STOP_THRESHOLD = 0.001; // min velocity before stopping
+  const WHEEL_STOP_THRESHOLD = 0.001; // min velocity before stopping
 
   let latestZoomValue = 50; // default zoom value
   let zoomTimeout = null;
 
-  zoomSlider.addEventListener('input', (e) => {
-    zoomInput.value = (e.target.value * 100 / 8).toFixed(2);
+  zoomSlider.addEventListener("input", (e) => {
+    zoomInput.value = ((e.target.value * 100) / 8).toFixed(2);
     clearTimeout(zoomTimeout);
     latestZoomValue = e.target.valueAsNumber;
 
@@ -238,7 +229,7 @@ function handleFile(file) {
     const centerPx = scrollLeft + containerWidth / 2;
     const centerTime = centerPx / currentPxPerSec;
 
-    const newPxPerSec = (containerWidth / duration) + zoomValue ** 2;
+    const newPxPerSec = containerWidth / duration + zoomValue ** 2;
 
     if (wavesurfer) {
       wavesurfer.zoom(newPxPerSec);
@@ -248,11 +239,9 @@ function handleFile(file) {
       scrollEl.scrollLeft = newCenterPx - containerWidth / 2;
     }
 
-    title.innerText = "Click and drag the waveform, or use the scroll wheel over it";
+    title.innerText =
+      "Click and drag the waveform, or use the scroll wheel over it";
   }
-
-
-
 
   // === DRAG STATE ===
   let isDown = false;
@@ -269,17 +258,17 @@ function handleFile(file) {
   let wheelTimeout = null;
 
   // === DRAG EVENTS ===
-  wave.addEventListener('mousedown', e => {
+  wave.addEventListener("mousedown", (e) => {
     isDown = true;
     startX = e.pageX - wave.offsetLeft;
     startScroll = wave.scrollLeft;
     lastX = startX;
     cancelAnimationFrame(dragMomentumId);
-    wave.classList.add('dragging');
+    wave.classList.add("dragging");
     e.preventDefault();
   });
 
-  wave.addEventListener('mousemove', e => {
+  wave.addEventListener("mousemove", (e) => {
     if (!isDown) return;
     const x = e.pageX - wave.offsetLeft;
     const delta = x - startX;
@@ -288,11 +277,11 @@ function handleFile(file) {
     wave.scrollLeft = startScroll - delta;
   });
 
-  ['mouseup', 'mouseleave'].forEach(evt =>
+  ["mouseup", "mouseleave"].forEach((evt) =>
     wave.addEventListener(evt, () => {
       if (!isDown) return;
       isDown = false;
-      wave.classList.remove('dragging');
+      wave.classList.remove("dragging");
       dragMomentum();
     })
   );
@@ -306,26 +295,31 @@ function handleFile(file) {
   }
 
   // === WHEEL EVENTS ===
-  wave.addEventListener('wheel', e => {
-    e.preventDefault();
+  wave.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
 
-    const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
-    targetWheelVelocity += scaledDelta;
+      const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
+      targetWheelVelocity += scaledDelta;
 
-    clearTimeout(wheelTimeout);
-    if (!wheelMomentumId) {
-      wheelMomentum(); // begin loop if not running
-    }
+      clearTimeout(wheelTimeout);
+      if (!wheelMomentumId) {
+        wheelMomentum(); // begin loop if not running
+      }
 
-    wheelTimeout = setTimeout(() => {
-      targetWheelVelocity = 0;
-    }, WHEEL_IDLE_TIMEOUT);
-  }, { passive: false });
+      wheelTimeout = setTimeout(() => {
+        targetWheelVelocity = 0;
+      }, WHEEL_IDLE_TIMEOUT);
+    },
+    { passive: false }
+  );
 
   function wheelMomentum() {
     if (targetWheelVelocity !== 0) {
       // While user is still interacting: ease toward target
-      wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
+      wheelVelocity +=
+        (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
     } else {
       // After input stops: decelerate gradually
       wheelVelocity *= WHEEL_DECELERATION;
@@ -335,7 +329,10 @@ function handleFile(file) {
     wave.scrollLeft += wheelVelocity;
 
     // Continue if still moving
-    if (Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD || Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD) {
+    if (
+      Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD ||
+      Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD
+    ) {
       wheelMomentumId = requestAnimationFrame(wheelMomentum);
     } else {
       wheelVelocity = 0;
@@ -343,23 +340,6 @@ function handleFile(file) {
       wheelMomentumId = null;
     }
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   const reader = new FileReader();
 
@@ -375,9 +355,9 @@ function handleFile(file) {
     console.log("File reading started");
     title.innerText = "Starting file load...";
   };
-  reader.onload = async e => {
+  reader.onload = async (e) => {
     console.log("File fully loaded into memory");
-    title.innerText = "Tweak the sliders!"
+    title.innerText = "Tweak the sliders!";
     try {
       const arrayBuffer = e.target.result;
       const ctx = new AudioContext();
@@ -386,7 +366,7 @@ function handleFile(file) {
       title.innerText = "Audio decoded, normalizing...";
       normalizeAudioBuffer(audioBuffer);
       precomputedPeaks = computePeaks(audioBuffer);
-      autoAdjustThresholdSlider()
+      autoAdjustThresholdSlider();
       console.log("Processing regions...");
       handleThresholdChange();
       drawRegions();
@@ -397,8 +377,7 @@ function handleFile(file) {
       console.log("File processing complete");
     } catch (err) {
       console.error("Processing error:", err);
-      title.innerText = `Processing error: ${err}. Try to play your file first. Maybe it doesn't have audio.`
-
+      title.innerText = `Processing error: ${err}. Try to play your file first. Maybe it doesn't have audio.`;
     }
   };
 
@@ -412,17 +391,17 @@ function handleFile(file) {
 
   console.log("Starting readAsArrayBuffer...");
   reader.readAsArrayBuffer(file);
-  console.log("readAsArrayBuffer called (this doesn't mean loading is complete)");
+  console.log(
+    "readAsArrayBuffer called (this doesn't mean loading is complete)"
+  );
 }
 
 function computePeaks(buffer) {
-  const originalDuration = audioBuffer ? (audioBuffer.duration || 0) : 0;
+  const originalDuration = audioBuffer ? audioBuffer.duration || 0 : 0;
   const data = buffer.getChannelData(0);
   const sampleRate = buffer.sampleRate;
   const peaks = [];
   const numberOfPeaks = 250 * Math.floor(audioBuffer.duration); // desired peaks per second * number of seconds
-  
-  
 
   const samplesPerChunk = Math.floor(data.length / numberOfPeaks);
   for (let i = 0; i < data.length; i += samplesPerChunk) {
@@ -435,9 +414,7 @@ function computePeaks(buffer) {
 }
 
 function easeInOutQuad(t) {
-  return t < 0.5
-    ? 2 * t * t
-    : -1 + (4 - 2 * t) * t;
+  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 }
 
 /**
@@ -445,7 +422,6 @@ function easeInOutQuad(t) {
  * over `duration` milliseconds, using an ease-in-out curve.
  */
 function smoothScrollTo(el, targetScroll, duration = 1000) {
-
   const startScroll = el.scrollLeft;
   const change = targetScroll - startScroll;
   const startTime = performance.now();
@@ -469,7 +445,7 @@ function smoothScrollTo(el, targetScroll, duration = 1000) {
  * of the visible area, easing over 1 second.
  */
 function scrollToTimeSmooth(timeInSec) {
-  const wave = document.querySelector('#waveform wave');
+  const wave = document.querySelector("#waveform wave");
   if (!wavesurfer) return;
   const pxPerSec = wavesurfer.params.minPxPerSec;
   const targetPx = timeInSec * pxPerSec;
@@ -477,14 +453,16 @@ function scrollToTimeSmooth(timeInSec) {
   const offset = wave.clientWidth / 2;
   let scrollPos = targetPx - offset;
   // clamp into valid range:
-  scrollPos = Math.max(0, Math.min(scrollPos, wave.scrollWidth - wave.clientWidth));
+  scrollPos = Math.max(
+    0,
+    Math.min(scrollPos, wave.scrollWidth - wave.clientWidth)
+  );
 
   smoothScrollTo(wave, scrollPos, 1000);
 }
 
 // Usage: jumps in smoothly to 12.3 s
 scrollToTimeSmooth(12.3);
-
 
 function handleThresholdChange() {
   if (!audioBuffer) return;
@@ -511,7 +489,7 @@ function applyShrinkFilter(shrinkMs, minRegionDuration) {
   }
 
   // Remove any that became too short
-  if (silentRegions.some(r => (r.end - r.start) < minRegionDuration)) {
+  if (silentRegions.some((r) => r.end - r.start < minRegionDuration)) {
     silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
   }
 }
@@ -519,7 +497,7 @@ function applyShrinkFilter(shrinkMs, minRegionDuration) {
 function enforceMinRegionDuration(regions, minDuration) {
   if (!regions.length) return [];
 
-  const merged = [ { ...regions[0] } ];
+  const merged = [{ ...regions[0] }];
 
   for (let i = 1; i < regions.length; i++) {
     const prev = merged[merged.length - 1];
@@ -542,8 +520,6 @@ function enforceMinRegionDuration(regions, minDuration) {
   return merged;
 }
 
-
-
 function markSilentRegions() {
   const raw = +thresholdSlider.value / 100;
   const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
@@ -560,7 +536,7 @@ function markSilentRegions() {
 
     if (max <= threshold) {
       if (!silent) {
-        if (currentRegion && (time - currentRegion.end) < minRegionDuration) {
+        if (currentRegion && time - currentRegion.end < minRegionDuration) {
           currentRegion.end = time;
         } else {
           currentRegion = { start: time };
@@ -570,7 +546,7 @@ function markSilentRegions() {
     } else {
       if (silent) {
         currentRegion.end = time;
-        if ((currentRegion.end - currentRegion.start) > minRegionDuration) {
+        if (currentRegion.end - currentRegion.start > minRegionDuration) {
           silentRegions.push({ ...currentRegion });
         }
         silent = false;
@@ -581,52 +557,51 @@ function markSilentRegions() {
 
   if (silent && currentRegion) {
     currentRegion.end = audioBuffer.duration;
-    if ((currentRegion.end - currentRegion.start) > minRegionDuration) {
+    if (currentRegion.end - currentRegion.start > minRegionDuration) {
       silentRegions.push({ ...currentRegion });
     }
   }
 
   applyShrinkFilter(shrinkMs, minRegionDuration);
   silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
-  thresholdLine.style.display = 'block';
-  title.innerText = "Silent parts in red will be removed - Tweak the sliders carefully :)";
+  thresholdLine.style.display = "block";
+  title.innerText =
+    "Silent parts in red will be removed - Tweak the sliders carefully :)";
   drawRegions();
   updateStats();
 }
 
 function drawRegions() {
-
   if (!wavesurfer) return;
-  Object.values(wavesurfer.regions.list).forEach(region => region.remove());
+  Object.values(wavesurfer.regions.list).forEach((region) => region.remove());
 
-  silentRegions.forEach(region => {
+  silentRegions.forEach((region) => {
     wavesurfer.addRegion({
       start: region.start,
       end: region.end,
-      color: 'rgba(255,0,0,0.3)',
+      color: "rgba(255,0,0,0.3)",
       drag: false,
-      resize: false
+      resize: false,
     });
   });
 }
 
 function updateStats() {
-  const originalDuration = audioBuffer ? (audioBuffer.duration || 0) : 0;
+  const originalDuration = audioBuffer ? audioBuffer.duration || 0 : 0;
   let totalSilence = 0;
-  silentRegions.forEach(region => {
-    totalSilence += (region.end - region.start);
+  silentRegions.forEach((region) => {
+    totalSilence += region.end - region.start;
   });
   const timeSaved = totalSilence.toFixed(2);
-  const percentSaved = (originalDuration ? (timeSaved / originalDuration * 100) : 0).toFixed(1);
+  const percentSaved = (
+    originalDuration ? (timeSaved / originalDuration) * 100 : 0
+  ).toFixed(1);
   let minutes = Math.floor(timeSaved / 60);
   let seconds = +(timeSaved % 60).toFixed(0); // round to 2 decimal places
 
-  let timeDisplay = timeSaved > 60
-    ? `${minutes}m ${seconds}s`
-    : `${seconds}s`;
+  let timeDisplay = timeSaved > 60 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 
   statsPanel.innerText = `Time saved: ${timeDisplay} - ${percentSaved}% shorter - ${silentRegions.length} silence regions`;
-
 }
 
 async function cutAudio() {
@@ -634,7 +609,7 @@ async function cutAudio() {
 
   // 1. Initial setup
   title.innerText = "Preparing...";
-  await new Promise(r => setTimeout(r, 10));
+  await new Promise((r) => setTimeout(r, 10));
 
   // 2. Process regions with progress
   title.innerText = "Processing regions (0%)...";
@@ -657,12 +632,12 @@ async function cutAudio() {
     if (i % 3 === 0) {
       const percent = Math.floor((i / silentRegions.length) * 100);
       title.innerText = `Processing regions (${percent}%)...`;
-      await new Promise(r => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
     }
   }
 
   // 3. Final segment
-  await new Promise(r => setTimeout(r, 10));
+  await new Promise((r) => setTimeout(r, 10));
   const startSample = Math.floor(lastEnd * sampleRate);
   const endSample = audioBuffer.length;
   if (endSample > startSample) {
@@ -686,7 +661,7 @@ async function cutAudio() {
       // Update progress periodically
       if (i % (CHUNK_SIZE * 10) === 0) {
         const percent = Math.floor(((writePosition + i) / totalLength) * 100);
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
         title.innerText = `Creating buffer (${percent}%)...`;
       }
     }
@@ -694,20 +669,19 @@ async function cutAudio() {
   }
 
   title.innerText = "Encoding... (Takes a few seconds)";
-  await new Promise(r => setTimeout(r, 10)); // Ensure UI renders
+  await new Promise((r) => setTimeout(r, 10)); // Ensure UI renders
 
   try {
-    lastBlob = outputFormat === 'mp3'
-      ? await encodeMP3Async(newBuffer) // Modified to be async
-      : await encodeWAVAsync(newBuffer); // Modified to be async
+    lastBlob =
+      outputFormat === "mp3"
+        ? await encodeMP3Async(newBuffer) // Modified to be async
+        : await encodeWAVAsync(newBuffer); // Modified to be async
 
     audioPreview.src = URL.createObjectURL(lastBlob);
     title.innerText = "Done! Consider donating â¤";
-    audioPreview.style.display = 'inline-block';
-    downloadBtn.style.display = 'inline-block';
-    scrollToBottomWithDelay()
-
-
+    audioPreview.style.display = "inline-block";
+    downloadBtn.style.display = "inline-block";
+    scrollToBottomWithDelay();
   } catch (err) {
     title.innerText = "Encoding failed";
     console.error(err);
@@ -716,7 +690,7 @@ async function cutAudio() {
 
 // Modified encoder functions
 function encodeMP3Async(buffer) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     setTimeout(() => {
       const result = encodeMP3(buffer);
       resolve(result);
@@ -725,7 +699,7 @@ function encodeMP3Async(buffer) {
 }
 
 function encodeWAVAsync(buffer) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     setTimeout(() => {
       const result = encodeWAV(buffer);
       resolve(result);
@@ -734,7 +708,7 @@ function encodeWAVAsync(buffer) {
 }
 
 function encodeWAV(buffer) {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const numOfChan = buffer.numberOfChannels;
     const length = buffer.length * numOfChan * 2 + 44;
     const bufferArray = new ArrayBuffer(length);
@@ -749,23 +723,32 @@ function encodeWAV(buffer) {
     }
 
     function write16bitSample(sample) {
-      view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
       pos += 2;
     }
 
-    writeString('RIFF');
-    view.setUint32(pos, length - 8, true); pos += 4;
-    writeString('WAVE');
-    writeString('fmt ');
-    view.setUint32(pos, 16, true); pos += 4;
-    view.setUint16(pos, 1, true); pos += 2;
-    view.setUint16(pos, numOfChan, true); pos += 2;
-    view.setUint32(pos, buffer.sampleRate, true); pos += 4;
-    view.setUint32(pos, buffer.sampleRate * 2, true); pos += 4;
-    view.setUint16(pos, numOfChan * 2, true); pos += 2;
-    view.setUint16(pos, 16, true); pos += 2;
-    writeString('data');
-    view.setUint32(pos, length - pos - 4, true); pos += 4;
+    writeString("RIFF");
+    view.setUint32(pos, length - 8, true);
+    pos += 4;
+    writeString("WAVE");
+    writeString("fmt ");
+    view.setUint32(pos, 16, true);
+    pos += 4;
+    view.setUint16(pos, 1, true);
+    pos += 2;
+    view.setUint16(pos, numOfChan, true);
+    pos += 2;
+    view.setUint32(pos, buffer.sampleRate, true);
+    pos += 4;
+    view.setUint32(pos, buffer.sampleRate * 2, true);
+    pos += 4;
+    view.setUint16(pos, numOfChan * 2, true);
+    pos += 2;
+    view.setUint16(pos, 16, true);
+    pos += 2;
+    writeString("data");
+    view.setUint32(pos, length - pos - 4, true);
+    pos += 4;
     for (let i = 0; i < buffer.numberOfChannels; i++) {
       channels.push(buffer.getChannelData(i));
     }
@@ -788,8 +771,7 @@ function encodeMP3(buffer) {
   function floatTo16BitPCM(input) {
     const output = new Int16Array(input.length);
     for (let i = 0; i < input.length; i++) {
-
-      output[i] = Math.max(-1, Math.min(1, input[i])) * 0x7FFF;
+      output[i] = Math.max(-1, Math.min(1, input[i])) * 0x7fff;
     }
     return output;
   }
@@ -807,8 +789,7 @@ function encodeMP3(buffer) {
     data.push(new Int8Array(endBuf));
   }
 
-  return new Blob(data, { type: 'audio/mp3' });
-
+  return new Blob(data, { type: "audio/mp3" });
 }
 
 function calculateNonSilentRanges() {
@@ -816,8 +797,8 @@ function calculateNonSilentRanges() {
   let regions = [];
 
   let lastEnd = 0;
-  title.innerText = "Getting ready..."
-  silentRegions.forEach(region => {
+  title.innerText = "Getting ready...";
+  silentRegions.forEach((region) => {
     if (region.start > lastEnd) {
       regions.push({ start: lastEnd, end: region.start });
     }
@@ -832,12 +813,19 @@ function calculateNonSilentRanges() {
 }
 
 async function cutVideo() {
+  console.log("🧠 cutVideo() called");
+
+  const uploadedFile = window.uploadedFile;
+  console.log("📦 typeof uploadedFile:", typeof uploadedFile);
+  console.log("📦 uploadedFile:", uploadedFile);
+
   if (!uploadedFile) {
-    alert("Please upload a video first!");
+    console.warn("❌ No uploaded file — exiting early.");
     return;
   }
 
   const nonSilentRegions = calculateNonSilentRanges();
+  console.log("📏 nonSilentRegions:", nonSilentRegions);
 
   if (nonSilentRegions.length === 0) {
     alert("No silence detected â€” full video kept!");
@@ -852,8 +840,9 @@ async function cutVideo() {
     const { createFFmpeg, fetchFile: ffetch } = window.FFmpegLib;
     ffmpeg = createFFmpeg({ log: true });
     await ffmpeg.load({
-      classWorkerURL: new URL('/worker/worker.mjs', window.location.origin).href,
-      workerOptions: { type: 'module' }
+      classWorkerURL: new URL("/worker/worker.mjs", window.location.origin)
+        .href,
+      workerOptions: { type: "module" },
     });
     ffmpegLoaded = true;
   }
@@ -862,19 +851,26 @@ async function cutVideo() {
     await initFFmpeg();
   }
 
-  let totalParts = nonSilentRegions.length
+  let totalParts = nonSilentRegions.length;
   let allSegmentFileNames = [];
   let psScriptLines = [];
   let bashScriptLines = [];
   let fileListLines = [];
 
-  for (let batchStart = 0; batchStart < nonSilentRegions.length; batchStart += BATCH_SIZE) {
-    const batchRegions = nonSilentRegions.slice(batchStart, batchStart + BATCH_SIZE);
+  for (
+    let batchStart = 0;
+    batchStart < nonSilentRegions.length;
+    batchStart += BATCH_SIZE
+  ) {
+    const batchRegions = nonSilentRegions.slice(
+      batchStart,
+      batchStart + BATCH_SIZE
+    );
     const segmentFileNames = [];
     console.log(`--- Processing batch ${batchIndex + 1} ---`);
 
     // Write input file again (after first batch or restart)
-    await ffmpeg.writeFile('input.mp4', await fetchFile(uploadedFile));
+    await ffmpeg.writeFile("input.mp4", await fetchFile(uploadedFile));
     for (let i = 0; i < batchRegions.length; i++) {
       const region = batchRegions[i];
       const segmentIndex = batchStart + i;
@@ -887,26 +883,39 @@ async function cutVideo() {
       wavesurfer.addRegion({
         start: region.start,
         end: region.end,
-        color: 'rgba(0, 255, 0, 0.7)',
+        color: "rgba(0, 255, 0, 0.7)",
         drag: false,
-        resize: false
+        resize: false,
       });
 
       const args = [
-        '-ss', region.start.toFixed(6),
-        '-i', 'input.mp4',
-        '-to', (region.end - region.start).toFixed(6),
-        '-c:v', 'libx264',
-        '-crf', '20',
-        '-preset', 'ultrafast',
-        '-profile:v', 'high',
-        '-pix_fmt', 'yuv420p',
-        '-movflags', '+faststart',
-        '-c:a', 'aac',
-        '-b:a', '128k',
-        '-threads', '0',
-        '-avoid_negative_ts', '1',
-        outputName
+        "-ss",
+        region.start.toFixed(6),
+        "-i",
+        "input.mp4",
+        "-to",
+        (region.end - region.start).toFixed(6),
+        "-c:v",
+        "libx264",
+        "-crf",
+        "20",
+        "-preset",
+        "ultrafast",
+        "-profile:v",
+        "high",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-threads",
+        "0",
+        "-avoid_negative_ts",
+        "1",
+        outputName,
       ];
 
       await ffmpeg.exec(args);
@@ -914,8 +923,12 @@ async function cutVideo() {
       // Add to PowerShell and Bash script lines
       const start = region.start.toFixed(6);
       const duration = (region.end - region.start).toFixed(6);
-      psScriptLines.push(`ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`);
-      bashScriptLines.push(`ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`);
+      psScriptLines.push(
+        `ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`
+      );
+      bashScriptLines.push(
+        `ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`
+      );
       fileListLines.push(`file '${outputName}'`);
     }
 
@@ -936,16 +949,25 @@ async function cutVideo() {
   }
 
   // Add final concat logic to scripts
-  psScriptLines.push('\n@"\n' + fileListLines.join('\n') + '\n"@ | Out-File -Encoding ASCII list.txt');
-  psScriptLines.push('ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4\n');
+  psScriptLines.push(
+    '\n@"\n' +
+      fileListLines.join("\n") +
+      '\n"@ | Out-File -Encoding ASCII list.txt'
+  );
+  psScriptLines.push(
+    "ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4\n"
+  );
 
-  bashScriptLines.push('cat << EOF > list.txt\n' + fileListLines.join('\n') + '\nEOF');
-  bashScriptLines.push('ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4');
+  bashScriptLines.push(
+    "cat << EOF > list.txt\n" + fileListLines.join("\n") + "\nEOF"
+  );
+  bashScriptLines.push(
+    "ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4"
+  );
 
   // Output to textareas
-  document.getElementById("psScript").value = psScriptLines.join('\n');
-  document.getElementById("bashScript").value = bashScriptLines.join('\n');
-
+  document.getElementById("psScript").value = psScriptLines.join("\n");
+  document.getElementById("bashScript").value = bashScriptLines.join("\n");
 
   // Save the buffers for further use (merge all batches, etc.)
   window.processedBatches = fullOutputBuffers;
@@ -965,8 +987,8 @@ async function mergeAllBatches() {
   const { createFFmpeg } = window.FFmpegLib;
   const ffmpegMerge = createFFmpeg({ log: true });
   await ffmpegMerge.load({
-    classWorkerURL: new URL('/worker/worker.mjs', window.location.origin).href,
-    workerOptions: { type: 'module' }
+    classWorkerURL: new URL("/worker/worker.mjs", window.location.origin).href,
+    workerOptions: { type: "module" },
   });
 
   // Write all batch files and create list.txt
@@ -977,52 +999,63 @@ async function mergeAllBatches() {
     listLines.push(`file '${filename}'`);
   }
 
-  await ffmpegMerge.writeFile('list.txt', listLines.join('\n'));
+  await ffmpegMerge.writeFile("list.txt", listLines.join("\n"));
 
   // Concatenate batches
   const args = [
-    '-f', 'concat',
-    '-safe', '0',
-    '-i', 'list.txt',
-    '-c', 'copy',
-    'final_merged.mp4'
+    "-f",
+    "concat",
+    "-safe",
+    "0",
+    "-i",
+    "list.txt",
+    "-c",
+    "copy",
+    "final_merged.mp4",
   ];
 
   await ffmpegMerge.exec(args);
 
   // Read final merged output
-  const finalData = await ffmpegMerge.readFile('final_merged.mp4');
-  const blob = new Blob([finalData.buffer], { type: 'video/mp4' });
+  const finalData = await ffmpegMerge.readFile("final_merged.mp4");
+  const blob = new Blob([finalData.buffer], { type: "video/mp4" });
   const url = URL.createObjectURL(blob);
 
   // Display or download
-  const videoPreview = document.querySelector('#videoPreview');
+  const videoPreview = document.querySelector("#videoPreview");
   title.innerText = "Done! Consider donating â¤";
 
   videoPreview.src = url;
-  videoPreview.style.display = 'inline-block';
-  downloadVideoBtn.style.display = 'inline-block';
-  copyBtnBASH.style.display = 'inline-block';
-  copyBtnPS.style.display = 'inline-block';
+  videoPreview.style.display = "inline-block";
+  downloadVideoBtn.style.display = "inline-block";
+  copyBtnBASH.style.display = "inline-block";
+  copyBtnPS.style.display = "inline-block";
   downloadVideoBtn.onclick = () => {
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = 'final_merged.mp4';
+    a.download = "final_merged.mp4";
     a.click();
   };
-  scrollToBottomWithDelay()
+  scrollToBottomWithDelay();
   console.log("Final video merged and loaded.");
 }
 
-async function concatSegments(fileNames, outputFileName = 'final.mp4') {
-  await ffmpeg.writeFile('list.txt', fileNames.map(name => `file '${name}'`).join('\n'));
+async function concatSegments(fileNames, outputFileName = "final.mp4") {
+  await ffmpeg.writeFile(
+    "list.txt",
+    fileNames.map((name) => `file '${name}'`).join("\n")
+  );
 
   const ffmpegArgs = [
-    '-f', 'concat',
-    '-safe', '0',
-    '-i', 'list.txt',
-    '-c', 'copy',
-    outputFileName
+    "-f",
+    "concat",
+    "-safe",
+    "0",
+    "-i",
+    "list.txt",
+    "-c",
+    "copy",
+    outputFileName,
   ];
 
   await ffmpeg.exec(ffmpegArgs);
@@ -1054,39 +1087,44 @@ function scroll(duration) {
   requestAnimationFrame(step);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  const copyBtnBASH = document.getElementById('copyBtnBASH');
-  const copyBtnPS = document.getElementById('copyBtnPS');
-  const psScript = document.getElementById('psScript');
-  const bashScript = document.getElementById('bashScript');
+document.addEventListener("DOMContentLoaded", () => {
+  const copyBtnBASH = document.getElementById("copyBtnBASH");
+  const copyBtnPS = document.getElementById("copyBtnPS");
+  const psScript = document.getElementById("psScript");
+  const bashScript = document.getElementById("bashScript");
 
-
-  copyBtnPS.addEventListener('click', async () => {
+  copyBtnPS.addEventListener("click", async () => {
     try {
-      copyBtnPS.style.backgroundColor = '#2ecc71'
-      copyBtnPS.innerText = 'Copied PowerShell!'
+      copyBtnPS.style.backgroundColor = "#2ecc71";
+      copyBtnPS.innerText = "Copied PowerShell!";
       await navigator.clipboard.writeText(psScript.value);
       //alert('PowerShell script copied to clipboard!');
     } catch (err) {
-      console.error('Failed to copy:', err);
-      alert('Failed to copy script. Your browser may not support clipboard access.');
+      console.error("Failed to copy:", err);
+      alert(
+        "Failed to copy script. Your browser may not support clipboard access."
+      );
     }
   });
 
-  copyBtnBASH.addEventListener('click', async () => {
+  copyBtnBASH.addEventListener("click", async () => {
     try {
-      copyBtnBASH.style.backgroundColor = '#2ecc71'
-      copyBtnBASH.innerText = "Copied Bash!"
+      copyBtnBASH.style.backgroundColor = "#2ecc71";
+      copyBtnBASH.innerText = "Copied Bash!";
       await navigator.clipboard.writeText(bashScript.value);
       //alert('bash script copied to clipboard!');
     } catch (err) {
-      console.error('Failed to copy:', err);
-      alert('Failed to copy script. Your browser may not support clipboard access.');
+      console.error("Failed to copy:", err);
+      alert(
+        "Failed to copy script. Your browser may not support clipboard access."
+      );
     }
   });
 });
 
-document.getElementById('invert').addEventListener('click', invertSilentRegions);
+document
+  .getElementById("invert")
+  .addEventListener("click", invertSilentRegions);
 function invertSilentRegions() {
   if (!silentRegions || silentRegions.length === 0) {
     alert("No silent regions to invert.");
@@ -1129,19 +1167,25 @@ function autoAdjustThresholdSlider() {
   const originalThreshold = thresholdSlider.value;
 
   const scan = (from, to, direction) => {
-    for (let val = from; direction > 0 ? val <= to : val >= to; val += direction * step) {
+    for (
+      let val = from;
+      direction > 0 ? val <= to : val >= to;
+      val += direction * step
+    ) {
       thresholdSlider.value = val;
       handleThresholdChange(); // triggers markSilentRegions
       const originalDuration = audioBuffer.duration || 0;
 
       let totalSilence = 0;
       for (const region of silentRegions) {
-        totalSilence += (region.end - region.start);
+        totalSilence += region.end - region.start;
       }
 
       const timeSaved = totalSilence;
-      const percentSaved = (originalDuration ? (timeSaved / originalDuration * 100) : 0);
-      
+      const percentSaved = originalDuration
+        ? (timeSaved / originalDuration) * 100
+        : 0;
+
       if (direction > 0 && percentSaved > 0) {
         foundMin = prevFound;
         break;
@@ -1151,7 +1195,7 @@ function autoAdjustThresholdSlider() {
         foundMax = prevFound;
         break;
       }
-      prevFound = val
+      prevFound = val;
     }
   };
 
@@ -1170,5 +1214,7 @@ function autoAdjustThresholdSlider() {
   shrinkSlider.value = savedShrink;
 
   handleThresholdChange(); // reapply current threshold
-  console.log(`Threshold range adjusted: ${thresholdSlider.min}% â€“ ${thresholdSlider.max}%`);
+  console.log(
+    `Threshold range adjusted: ${thresholdSlider.min}% â€“ ${thresholdSlider.max}%`
+  );
 }
