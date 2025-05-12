@@ -25,10 +25,9 @@ let silentRegions = [];
 let lastBlob = null;
 let outputFormat = "mp3";
 let precomputedPeaks = [];
-let uploadedFile = null;
 let ffmpeg;
 let fetchFile;
-let ffmpegLoaded = false;
+
 
 export async function main() {
   const { createFFmpeg, fetchFile: ffetch } = window.FFmpegLib;
@@ -186,7 +185,7 @@ function handleFile(file) {
 
   wavesurfer.on("ready", () => {
     // Prevent zoom from auto-scrolling to playhead
-    wavesurfer.drawer.recenter = () => {};
+    wavesurfer.drawer.recenter = () => { };
   });
 
   title.innerText = wavesurfer.params.minPxPerSec;
@@ -847,8 +846,8 @@ function outputConcatScriptsToUI(
 ) {
   psScriptLines.push(
     '\n@"\n' +
-      fileListLines.join("\n") +
-      '\n"@ | Out-File -Encoding ASCII list.txt'
+    fileListLines.join("\n") +
+    '\n"@ | Out-File -Encoding ASCII list.txt'
   );
   psScriptLines.push(
     "ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4\n"
