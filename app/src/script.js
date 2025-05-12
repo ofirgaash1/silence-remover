@@ -158,8 +158,8 @@ function handleFile(file) {
   if (!file) return;
 
   console.log("handleFile() called");
-
   window.uploadedFile = file;
+
   if (wavesurfer) wavesurfer.destroy();
   audioBuffer = null;
   silentRegions = [];
@@ -827,8 +827,8 @@ async function cutVideo() {
   const nonSilentRegions = calculateNonSilentRanges();
   console.log("📏 nonSilentRegions:", nonSilentRegions);
 
-  if (nonSilentRegions.length === 0) {
-    alert("No silence detected â€” full video kept!");
+  if (!nonSilentRegions?.length) {
+    alert("No silence detected — full video kept!");
     return;
   }
 
