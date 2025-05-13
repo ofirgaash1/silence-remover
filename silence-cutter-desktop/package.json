@@ -1,19 +1,49 @@
 {
   "name": "silence-cutter-desktop",
   "version": "1.0.0",
-  "description": "",
+  "description": "Electron-based silence remover for audio/video",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder",
+    "dist": "electron-builder --win"
   },
   "keywords": [],
-  "author": "",
+  "author": "Ofir Gaash",
   "license": "ISC",
   "devDependencies": {
     "electron": "^36.2.0",
+    "electron-builder": "^26.0.12",
     "prettier": "3.5.3"
   },
   "dependencies": {
+    "wav-decoder": "^1.3.0",
+    "wav-encoder": "^1.3.0",
     "wavesurfer.js": "^6.6.4"
+  },
+  "build": {
+    "appId": "com.ofirgaash.silenceremover",
+    "files": [
+      "**/*",
+      "preload.js",
+      "electron-logic.js",
+      "bin/ffmpeg.exe"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/ffmpeg.exe",
+        "to": "ffmpeg.exe"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "mac": {
+      "icon": "icon.icns"
+    },
+    "linux": {
+      "icon": "icon.png"
+    }
   }
 }

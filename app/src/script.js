@@ -30,6 +30,8 @@ let fetchFile;
 
 
 export async function main() {
+  console.warn("inside main");
+
   const { createFFmpeg, fetchFile: ffetch } = window.FFmpegLib;
   ffmpeg = createFFmpeg({ log: true });
   fetchFile = ffetch;
@@ -61,6 +63,8 @@ const thresholdLine = document.getElementById("thresholdLine");
 const waveform = document.getElementById("waveform");
 
 thresholdSlider.addEventListener("input", updateThresholdLine);
+
+
 function updateThresholdLine() {
   const raw = parseFloat(thresholdSlider.value) / 100;
   const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
@@ -77,8 +81,17 @@ function setupUIEvents() {
   vidTitle.style.display = "none";
   audioPreview.style.display = "none";
 
-  browseBtn.addEventListener("click", () => fileInput.click());
-  fileInput.addEventListener("change", (e) => handleFile(e.target.files[0]));
+  browseBtn.addEventListener("click", triggerFileLoad);
+
+  fileInput.addEventListener("change", (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Prevent accidental double-trigger
+    fileInput.value = ""; // clear input so change fires again for same file
+    handleFile(file);
+  });
+
 
   dropZone.addEventListener("dragover", (e) => {
     e.preventDefault();
@@ -153,56 +166,17 @@ function normalizeAudioBuffer(buffer) {
   }
 }
 
-function handleFile(file) {
-  if (!file) return;
+function setupZoomAndScrollHandlers(wave) {
+  const WHEEL_SENSITIVITY = 1 / 8;
+  const WHEEL_ACCELERATION = 0.15;
+  const WHEEL_DECELERATION = 0.9;
+  const WHEEL_IDLE_TIMEOUT = 100;
 
-  console.log("handleFile() called");
-  window.uploadedFile = file;
+  const DRAG_DECELERATION = 0.95;
+  const DRAG_STOP_THRESHOLD = 0.001;
+  const WHEEL_STOP_THRESHOLD = 0.001;
 
-  if (wavesurfer) wavesurfer.destroy();
-  audioBuffer = null;
-  silentRegions = [];
-  lastBlob = null;
-  audioPreview.src = "";
-  videoPreview.src = "";
-
-  dropZone.style.display = "none";
-  waveformDiv.style.display = "block";
-
-  updateThresholdLine(); // Ensure line is placed immediately
-
-  wavesurfer = WaveSurfer.create({
-    container: waveformDiv,
-    cursorWidth: 0,
-    height: 128,
-    scrollParent: false,
-    waveColor: "blue",
-    progressColor: "blue",
-    backend: "WebAudio",
-    autoCenter: false, // may not do anything alone
-    plugins: [WaveSurfer.regions.create({})],
-  });
-
-  wavesurfer.on("ready", () => {
-    // Prevent zoom from auto-scrolling to playhead
-    wavesurfer.drawer.recenter = () => { };
-  });
-
-  title.innerText = wavesurfer.params.minPxPerSec;
-
-  const wave = document.querySelector("#waveform wave");
-
-  // === CONFIGURABLE PARAMETERS ===
-  const WHEEL_SENSITIVITY = 1 / 8; // scale wheel input
-  const WHEEL_ACCELERATION = 0.15; // how quickly velocity ramps up
-  const WHEEL_DECELERATION = 0.9; // how slowly it slows down
-  const WHEEL_IDLE_TIMEOUT = 100; // ms to wait before deceleration starts
-
-  const DRAG_DECELERATION = 0.95; // how slowly drag decays
-  const DRAG_STOP_THRESHOLD = 0.001; // min velocity before stopping
-  const WHEEL_STOP_THRESHOLD = 0.001; // min velocity before stopping
-
-  let latestZoomValue = 50; // default zoom value
+  let latestZoomValue = 50;
   let zoomTimeout = null;
 
   zoomSlider.addEventListener("input", (e) => {
@@ -210,39 +184,29 @@ function handleFile(file) {
     clearTimeout(zoomTimeout);
     latestZoomValue = e.target.valueAsNumber;
 
-    // Debounce zoom: wait until user stops sliding
     zoomTimeout = setTimeout(() => {
-      applyZoom(latestZoomValue);
-    }, 1); // Increase for performance if needed
+      applyZoom(latestZoomValue, wave);
+    }, 1);
   });
 
-  function applyZoom(zoomValue) {
-    const scrollEl = wave; // Your scrollable container
+  function applyZoom(zoomValue, waveEl) {
     const duration = audioBuffer?.duration || wavesurfer.getDuration() || 1;
-    const containerWidth = scrollEl.clientWidth;
+    const containerWidth = waveEl.clientWidth;
 
-    const currentPxPerSec =
-      wavesurfer.params.minPxPerSec || scrollEl.scrollWidth / duration;
-
-    const scrollLeft = scrollEl.scrollLeft;
+    const currentPxPerSec = wavesurfer.params.minPxPerSec || waveEl.scrollWidth / duration;
+    const scrollLeft = waveEl.scrollLeft;
     const centerPx = scrollLeft + containerWidth / 2;
     const centerTime = centerPx / currentPxPerSec;
-
     const newPxPerSec = containerWidth / duration + zoomValue ** 2;
 
-    if (wavesurfer) {
-      wavesurfer.zoom(newPxPerSec);
+    wavesurfer.zoom(newPxPerSec);
 
-      // Now safe to apply scroll immediately â€” no more zoom "fighting"
-      const newCenterPx = centerTime * newPxPerSec;
-      scrollEl.scrollLeft = newCenterPx - containerWidth / 2;
-    }
+    const newCenterPx = centerTime * newPxPerSec;
+    waveEl.scrollLeft = newCenterPx - containerWidth / 2;
 
-    title.innerText =
-      "Click and drag the waveform, or use the scroll wheel over it";
+    title.innerText = "Click and drag the waveform, or use the scroll wheel over it";
   }
 
-  // === DRAG STATE ===
   let isDown = false;
   let startX = 0;
   let startScroll = 0;
@@ -250,13 +214,11 @@ function handleFile(file) {
   let lastX = 0;
   let dragMomentumId = null;
 
-  // === WHEEL STATE ===
   let wheelVelocity = 0;
   let targetWheelVelocity = 0;
   let wheelMomentumId = null;
   let wheelTimeout = null;
 
-  // === DRAG EVENTS ===
   wave.addEventListener("mousedown", (e) => {
     isDown = true;
     startX = e.pageX - wave.offsetLeft;
@@ -285,7 +247,6 @@ function handleFile(file) {
     })
   );
 
-  // === DRAG INERTIA ===
   function dragMomentum() {
     if (Math.abs(dragVelocity) < DRAG_STOP_THRESHOLD) return;
     wave.scrollLeft -= dragVelocity;
@@ -293,7 +254,6 @@ function handleFile(file) {
     dragMomentumId = requestAnimationFrame(dragMomentum);
   }
 
-  // === WHEEL EVENTS ===
   wave.addEventListener(
     "wheel",
     (e) => {
@@ -303,9 +263,7 @@ function handleFile(file) {
       targetWheelVelocity += scaledDelta;
 
       clearTimeout(wheelTimeout);
-      if (!wheelMomentumId) {
-        wheelMomentum(); // begin loop if not running
-      }
+      if (!wheelMomentumId) wheelMomentum();
 
       wheelTimeout = setTimeout(() => {
         targetWheelVelocity = 0;
@@ -316,18 +274,13 @@ function handleFile(file) {
 
   function wheelMomentum() {
     if (targetWheelVelocity !== 0) {
-      // While user is still interacting: ease toward target
-      wheelVelocity +=
-        (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
+      wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
     } else {
-      // After input stops: decelerate gradually
       wheelVelocity *= WHEEL_DECELERATION;
     }
 
-    // Apply scroll
     wave.scrollLeft += wheelVelocity;
 
-    // Continue if still moving
     if (
       Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD ||
       Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD
@@ -339,63 +292,354 @@ function handleFile(file) {
       wheelMomentumId = null;
     }
   }
+}
 
+
+async function triggerFileLoad() {
+  if (window.ElectronAPI) {
+    const filePath = await window.ElectronAPI.openVideoFile();
+    if (filePath) {
+      await handleFile({ path: filePath }); // ← guaranteed to have .path
+    }
+  } else {
+    console.log(`window.ElectronAPI = ${window.ElectronAPI} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`);
+
+    fileInput.click(); // browser will trigger onchange → handleFile(file)
+  }
+}
+
+
+fileInput.addEventListener("change", (e) => {
+  if (window.ElectronAPI) {
+    // Prevent accidental Electron fallback
+    console.warn("⚠️ Ignoring file input — Electron should use openVideoFile()");
+    return;
+  }
+
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  fileInput.value = ""; // clear input so change fires again for same file
+  handleFile(file);
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+async function handleFile(fileOrPath) {
+  console.warn("inside handleFile");
+
+  if (!fileOrPath) return;
+
+  const isElectron = !!window.ElectronAPI;
+  resetUIState();
+
+  if (isElectron && fileOrPath.path) {
+    console.log("⚡ Electron mode enabled");
+
+    const filePath = fileOrPath.path;
+    window.uploadedFile = { path: filePath }; // ✅ Set this immediately
+    const sampleRate = 44100;
+
+    // ✅ Updated: Only return peaks and WAV path
+    const { peaks, normalizedPath } = await window.ElectronAPI.extractWaveformPeaks(filePath);
+
+    // Sanity check
+    let minPeak = Infinity, maxPeak = -Infinity;
+    for (const val of peaks) {
+      if (val < minPeak) minPeak = val;
+      if (val > maxPeak) maxPeak = val;
+    }
+
+    console.log(`🧪 Peak sanity check — min: ${minPeak.toFixed(3)}, max: ${maxPeak.toFixed(3)}`);
+    if (minPeak < -1.01 || maxPeak > 1.01) {
+      console.warn("⚠️ Peaks are outside expected [-1, 1] range.");
+    } else if (minPeak === maxPeak) {
+      console.warn("⚠️ All peaks identical — silent or corrupt?");
+    } else {
+      console.log("✅ Peaks look good.");
+    }
+
+    console.log("📦 Raw peak sample:", peaks.slice(0, 10));
+    console.log("📏 Total peaks:", peaks.length);
+
+    // Step 2: Prepare data for silence detection
+    precomputedPeaks = peaks.map((p, i) => ({
+      peak: Math.abs(p),
+      time: i / sampleRate,
+    }));
+
+    // Step 3: Init WaveSurfer using normalizedPath
+    const arrayBuffer = await window.ElectronAPI.getNormalizedWavBuffer();
+    const blob = new Blob([arrayBuffer], { type: "audio/wav" });
+    const url = URL.createObjectURL(blob);
+    const wave = initializeWaveSurfer("WebAudio");
+    setupZoomAndScrollHandlers(wave);
+    wavesurfer.load(url);
+
+    // Step 4: Analyze after ready
+    wavesurfer.once("ready", () => {
+      console.log("🟢 WaveSurfer ready");
+      autoAdjustThresholdSlider();
+      handleThresholdChange();
+    });
+
+    // Step 5: Store file reference
+    
+    window.uploadedFile = { path: filePath };
+    console.log("✅ Normalized audio loaded and visualized");
+    handleThresholdChange()
+    return;
+  }
+
+
+
+
+  console.log("is browser!!!!!!!!!!");
+
+  // 🌐 Browser path
+  const file = fileOrPath;
+
+
+  // ✅ Fix: Store the file for later use
+  window.uploadedFile = file;
   const reader = new FileReader();
 
-  // Add progress event listener
   reader.onprogress = (e) => {
     if (e.lengthComputable) {
-      const percentLoaded = Math.round((e.loaded / e.total) * 100);
-      title.innerText = `Loading file... ${percentLoaded}%`;
+      const percent = Math.round((e.loaded / e.total) * 100);
+      title.innerText = `Loading file... ${percent}%`;
     }
   };
 
   reader.onloadstart = () => {
-    console.log("File reading started");
     title.innerText = "Starting file load...";
   };
+
   reader.onload = async (e) => {
-    console.log("File fully loaded into memory");
-    title.innerText = "Tweak the sliders!";
     try {
       const arrayBuffer = e.target.result;
       const ctx = new AudioContext();
-      title.innerText = "Decoding audio... (Takes a few seconds)";
+      title.innerText = "Decoding audio...";
       audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-      title.innerText = "Audio decoded, normalizing...";
+
+      title.innerText = "Normalizing...";
       normalizeAudioBuffer(audioBuffer);
+
       precomputedPeaks = computePeaks(audioBuffer);
-      autoAdjustThresholdSlider();
-      console.log("Processing regions...");
-      handleThresholdChange();
-      drawRegions();
 
-      console.log("Loading waveform...");
+
+      const wave = initializeWaveSurfer();
+      setupZoomAndScrollHandlers(wave);
       wavesurfer.loadDecodedBuffer(audioBuffer);
-
-      console.log("File processing complete");
+      autoAdjustThresholdSlider();
+      handleThresholdChange();
     } catch (err) {
-      console.error("Processing error:", err);
-      title.innerText = `Processing error: ${err}. Try to play your file first. Maybe it doesn't have audio.`;
+      title.innerText = `Audio decode error: ${err.message}`;
+      console.error("❌ Audio decode error:", err);
     }
   };
 
   reader.onerror = () => {
-    console.error("FileReader error:", reader.error);
+    console.error("❌ FileReader error:", reader.error);
+    title.innerText = "File load failed.";
   };
-
-  reader.onabort = () => {
-    console.warn("File reading aborted");
-  };
-
-  console.log("Starting readAsArrayBuffer...");
   reader.readAsArrayBuffer(file);
-  console.log(
-    "readAsArrayBuffer called (this doesn't mean loading is complete)"
-  );
 }
 
+
+function resetUIState() {
+  console.warn("inside resetUIState()");
+
+  if (wavesurfer) {
+    wavesurfer.destroy();
+    wavesurfer = null;
+  }
+
+  audioBuffer = null;
+  silentRegions = [];
+  lastBlob = null;
+  audioPreview.src = "";
+  videoPreview.src = "";
+
+  dropZone.style.display = "none";
+  waveformDiv.style.display = "block";
+  updateThresholdLine();
+}
+
+
+function initializeWaveSurfer(backend = "WebAudio") {
+  console.log("🛠️ Creating WaveSurfer with backend:", backend);
+  wavesurfer = WaveSurfer.create({
+    container: waveformDiv,
+    height: 128,
+    scrollParent: false,
+    waveColor: "blue",
+    progressColor: "blue",
+    backend,
+    autoCenter: false,
+    plugins: [WaveSurfer.regions.create({})],
+  });
+
+  return document.querySelector("#waveform wave");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+let playState = {
+  isPlaying: false,
+  stopRequested: false,
+  intervalId: null,
+};
+
+const PlayNonSilent = document.getElementById("Play-Non-Silent");
+
+function updatePlayButtonUI(mode) {
+  PlayNonSilent.innerText = mode === "stop" ? "⏹ Stop" : "▶️ Play Non-Silent";
+}
+
+function isTimeInSilentRegion(time) {
+  return silentRegions.some(r => time >= r.start && time < r.end);
+}
+
+function findNextNonSilentTime(time) {
+  // Find the next time that's outside of a silent region
+  for (const region of silentRegions) {
+    if (time >= region.start && time < region.end) {
+      return region.end;
+    }
+  }
+  return null;
+}
+
+function startLiveNonSilentPlayback() {
+  console.log("🧠 Starting real-time non-silent playback");
+
+  playState.stopRequested = false;
+  playState.isPlaying = true;
+  updatePlayButtonUI("stop");
+
+  wavesurfer.play();
+
+  playState.intervalId = setInterval(() => {
+    if (playState.stopRequested) {
+      console.log("🛑 Stop requested — stopping");
+      clearInterval(playState.intervalId);
+      wavesurfer.stop();
+      playState.isPlaying = false;
+      updatePlayButtonUI("play");
+      return;
+    }
+
+    const current = wavesurfer.getCurrentTime();
+
+    if (isTimeInSilentRegion(current)) {
+      const skipTo = findNextNonSilentTime(current);
+      if (skipTo !== null) {
+        console.log(`⏭️ Skipping silence at ${current.toFixed(2)} → ${skipTo.toFixed(2)}`);
+        wavesurfer.play(skipTo);
+      }
+    }
+  }, 50); // check every 50ms
+}
+
+PlayNonSilent.addEventListener("click", () => {
+  if (playState.isPlaying) {
+    playState.stopRequested = true;
+  } else {
+    startLiveNonSilentPlayback();
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+async function loadFileInBrowser(file) {
+  console.warn("inside loadFileInBrowser()");
+
+  const reader = new FileReader();
+
+  reader.onprogress = (e) => {
+    if (e.lengthComputable) {
+      const percent = Math.round((e.loaded / e.total) * 100);
+      title.innerText = `Loading file... ${percent}%`;
+    }
+  };
+
+  reader.onloadstart = () => {
+    title.innerText = "Starting file load...";
+  };
+
+  reader.onload = async (e) => {
+    title.innerText = "Decoding audio...";
+    try {
+      const ctx = new AudioContext();
+      audioBuffer = await ctx.decodeAudioData(e.target.result);
+      title.innerText = "Audio decoded, normalizing...";
+      normalizeAudioBuffer(audioBuffer);
+      precomputedPeaks = computePeaks(audioBuffer);
+      autoAdjustThresholdSlider();
+      handleThresholdChange();
+      drawRegions();
+
+      const wave = initializeWaveSurfer();
+      setupZoomAndScrollHandlers(wave);
+      wavesurfer.loadDecodedBuffer(audioBuffer);
+      title.innerText = "Ready!";
+    } catch (err) {
+      title.innerText = `Error: ${err.message}`;
+      console.error("Audio decode error:", err);
+    }
+  };
+
+  reader.onerror = () => console.error("FileReader error:", reader.error);
+  reader.readAsArrayBuffer(file);
+}
+
+
 function computePeaks(buffer) {
+  console.warn("inside computePeaks(buffer)");
+
   const originalDuration = audioBuffer ? audioBuffer.duration || 0 : 0;
   const data = buffer.getChannelData(0);
   const sampleRate = buffer.sampleRate;
@@ -464,16 +708,19 @@ function scrollToTimeSmooth(timeInSec) {
 scrollToTimeSmooth(12.3);
 
 function handleThresholdChange() {
-  if (!audioBuffer) return;
+  //console.warn("inside handleThresholdChange()");
+  if (!audioBuffer && !precomputedPeaks) return;
+  markSilentRegions();
+}
+function handleShrinkChange() {
+  //console.warn("inside handleshrinkchange()");
+  if (!audioBuffer && !precomputedPeaks) return;
   markSilentRegions();
 }
 
-function handleShrinkChange() {
-  if (!audioBuffer) return;
-  markSilentRegions();
-}
 
 function applyShrinkFilter(shrinkMs, minRegionDuration) {
+
   const shrinkSec = shrinkMs / 1000;
 
   for (let region of silentRegions) {
@@ -494,6 +741,7 @@ function applyShrinkFilter(shrinkMs, minRegionDuration) {
 }
 
 function enforceMinRegionDuration(regions, minDuration) {
+  //console.warn("inside enforceMinRegionDuration()");
   if (!regions.length) return [];
 
   const merged = [{ ...regions[0] }];
@@ -520,15 +768,25 @@ function enforceMinRegionDuration(regions, minDuration) {
 }
 
 function markSilentRegions() {
+
+  //  console.log("📍 inside markSilentRegions()");
+
   const raw = +thresholdSlider.value / 100;
   const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
   const threshold = mapped * mapped;
   const shrinkMs = +shrinkSlider.value;
   const minRegionDuration = 0.1;
 
+  //console.log("📊 thresholdSlider.value (raw %):", raw * 100);
+  //console.log("📈 threshold (mapped + squared):", threshold.toFixed(6));
+  //console.log("🔧 shrinkMs:", shrinkMs);
+  //console.log("🕒 minRegionDuration:", minRegionDuration);
+
   silentRegions = [];
   let silent = false;
   let currentRegion = null;
+
+  //console.log(`📉 precomputedPeaks.length = ${precomputedPeaks.length}`);
 
   for (let i = 0; i < precomputedPeaks.length; i++) {
     const { peak: max, time } = precomputedPeaks[i];
@@ -537,17 +795,27 @@ function markSilentRegions() {
       if (!silent) {
         if (currentRegion && time - currentRegion.end < minRegionDuration) {
           currentRegion.end = time;
+          //console.log("🔄 Extending short silent gap");
         } else {
           currentRegion = { start: time };
+          //console.log("🟥 Starting new silent region at", time.toFixed(3));
         }
         silent = true;
       }
     } else {
       if (silent) {
         currentRegion.end = time;
-        if (currentRegion.end - currentRegion.start > minRegionDuration) {
+        const duration = currentRegion.end - currentRegion.start;
+        //console.log("⬛ Ending silent region at", time.toFixed(3));
+        //console.log(`⏱️ Region duration: ${duration.toFixed(3)}s`);
+
+        if (duration > minRegionDuration) {
           silentRegions.push({ ...currentRegion });
+          //console.log("✅ Region pushed:", currentRegion);
+        } else {
+          silent = true
         }
+
         silent = false;
         currentRegion = null;
       }
@@ -555,56 +823,101 @@ function markSilentRegions() {
   }
 
   if (silent && currentRegion) {
-    currentRegion.end = audioBuffer.duration;
-    if (currentRegion.end - currentRegion.start > minRegionDuration) {
+    const fallbackDuration =
+      (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
+    currentRegion.end = fallbackDuration;
+
+    const duration = currentRegion.end - currentRegion.start;
+    //console.log("🔚 Final silent region to end of audio:", fallbackDuration.toFixed(3));
+    //console.log(`⏱️ Region duration: ${duration.toFixed(3)}s`);
+
+    if (duration > minRegionDuration) {
       silentRegions.push({ ...currentRegion });
+      //console.log("✅ Final region pushed:", currentRegion);
+    } else {
+      //console.log("⏭️ Final region skipped (too short)");
     }
   }
 
+  //console.log(`📦 Total silent regions detected: ${silentRegions.length}`);
+
   applyShrinkFilter(shrinkMs, minRegionDuration);
   silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
+
   thresholdLine.style.display = "block";
   title.innerText =
     "Silent parts in red will be removed - Tweak the sliders carefully :)";
+
   drawRegions();
   updateStats();
+
 }
+
 
 function drawRegions() {
-  if (!wavesurfer) return;
+  //console.warn("inside drawRegions...");
+
+  if (!wavesurfer) {
+    console.warn("⚠️ wavesurfer not initialized");
+    return;
+  }
+
+  // Clear existing regions
   Object.values(wavesurfer.regions.list).forEach((region) => region.remove());
 
+  //console.log(`🧠 silentRegions (${silentRegions.length}):`, silentRegions);
+
+  let drawn = 0;
+
   silentRegions.forEach((region) => {
-    wavesurfer.addRegion({
-      start: region.start,
-      end: region.end,
-      color: "rgba(255,0,0,0.3)",
-      drag: false,
-      resize: false,
-    });
+    if (region.start < region.end) {
+      drawn += 1;
+      wavesurfer.addRegion({
+        start: region.start,
+        end: region.end,
+        color: "rgba(255,0,0,0.3)",
+        drag: false,
+        resize: false,
+      });
+    }
   });
+
+  //console.log(`✅ drawn ${drawn} region(s)`);
 }
 
+
 function updateStats() {
-  const originalDuration = audioBuffer ? audioBuffer.duration || 0 : 0;
+  //console.warn("inside updateStats()");
+  const originalDuration =
+    (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
+
   let totalSilence = 0;
   silentRegions.forEach((region) => {
     totalSilence += region.end - region.start;
   });
+
   const timeSaved = totalSilence.toFixed(2);
   const percentSaved = (
-    originalDuration ? (timeSaved / originalDuration) * 100 : 0
+    originalDuration ? (totalSilence / originalDuration) * 100 : 0
   ).toFixed(1);
-  let minutes = Math.floor(timeSaved / 60);
-  let seconds = +(timeSaved % 60).toFixed(0); // round to 2 decimal places
 
-  let timeDisplay = timeSaved > 60 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  const minutes = Math.floor(timeSaved / 60);
+  const seconds = +(timeSaved % 60).toFixed(0);
 
-  statsPanel.innerText = `Time saved: ${timeDisplay} - ${percentSaved}% shorter - ${silentRegions.length} silence regions`;
+  const timeDisplay =
+    timeSaved > 60 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+  statsPanel.innerText = `Time saved: ${timeDisplay} – ${percentSaved}% shorter – ${silentRegions.length} silence regions`;
 }
 
+
 async function cutAudio() {
-  if (!audioBuffer) return;
+  console.warn("inside cutAudio");
+
+  if (!audioBuffer) {
+    alert("currently, this is a browser only featue. if you are using browser, your file doesnt have sound.")
+    return;
+  }
 
   // 1. Initial setup
   title.innerText = "Preparing...";
@@ -722,7 +1035,7 @@ function encodeWAV(buffer) {
     }
 
     function write16bitSample(sample) {
-      view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+      view.setInt16(pos, sample < 0 ? sample * 0x44100 : sample * 0x7fff, true);
       pos += 2;
     }
 
@@ -792,11 +1105,16 @@ function encodeMP3(buffer) {
 }
 
 function calculateNonSilentRanges() {
-  const originalDuration = audioBuffer ? audioBuffer.duration : 0;
-  let regions = [];
+  console.warn("inside calculateNonSilentRanges");
 
+  const originalDuration =
+    (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
+
+  let regions = [];
   let lastEnd = 0;
+
   title.innerText = "Getting ready...";
+
   silentRegions.forEach((region) => {
     if (region.start > lastEnd) {
       regions.push({ start: lastEnd, end: region.start });
@@ -811,7 +1129,10 @@ function calculateNonSilentRanges() {
   return regions;
 }
 
+
 function updateSegmentUI(region, index, total) {
+  console.warn("inside updateSegmentUI()");
+
   scrollToTimeSmooth(region.start);
   title.innerText = `Encoding part ${index + 1} of ${total}...`;
 
@@ -832,6 +1153,9 @@ function addFFmpegCommandScripts(
   bashScriptLines,
   fileListLines
 ) {
+
+  console.warn("inside addFFmpegCommandScripts");
+
   const ffmpegCommand = `ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`;
 
   psScriptLines.push(ffmpegCommand);
@@ -840,10 +1164,13 @@ function addFFmpegCommandScripts(
 }
 
 function outputConcatScriptsToUI(
+
+
   psScriptLines,
   bashScriptLines,
   fileListLines
 ) {
+  console.warn("inside outputConcatScriptsToUI");
   psScriptLines.push(
     '\n@"\n' +
     fileListLines.join("\n") +
@@ -865,6 +1192,8 @@ function outputConcatScriptsToUI(
 }
 
 async function mergeProcessedBatchesWithFFmpegWASM() {
+  console.warn("inside mergeProcessedBatchesWithFFmpegWASM");
+
   const { createFFmpeg } = window.FFmpegLib;
   const ffmpegMerge = createFFmpeg({ log: true });
 
@@ -902,6 +1231,8 @@ async function mergeProcessedBatchesWithFFmpegWASM() {
 }
 
 function displayMergedVideo(blob) {
+  console.warn("inside displayMergedVideo");
+
   const url = URL.createObjectURL(blob);
   const videoPreview = document.querySelector("#videoPreview");
 
@@ -925,9 +1256,12 @@ function displayMergedVideo(blob) {
 }
 
 async function cutVideo() {
+  console.warn("inside cutVideo");
+
   console.log("🧠 cutVideo() called");
 
   const uploadedFile = window.uploadedFile;
+
   if (!uploadedFile) {
     console.warn("❌ No uploaded file — exiting early.");
     return;
@@ -949,12 +1283,13 @@ async function cutVideo() {
 
   if (isElectron) {
     console.log("⚡ Detected Electron — using native FFmpeg");
+    console.log(`window.uploadedFile.path: ${window.uploadedFile.path}`);
 
-    const uploadedFileSerialized = {
-      name: uploadedFile.name,
-      type: uploadedFile.type,
-      buffer: await uploadedFile.arrayBuffer(),
-    };
+    const inputPath = window.uploadedFile.path; // set earlier in handleFile()
+    if (!inputPath) {
+      console.warn("❌ No input path set on uploadedFile");
+      return;
+    }
 
     for (let i = 0; i < totalParts; i++) {
       const region = nonSilentRegions[i];
@@ -973,15 +1308,20 @@ async function cutVideo() {
         fileListLines
       );
 
-      await window.ElectronAPI.cutOneSegment(uploadedFileSerialized, {
-        start: region.start,
-        end: region.end,
-        outputName,
-      });
+      await window.ElectronAPI.cutOneSegment(
+        { path: inputPath }, // ✅ Only pass file path
+        { start: region.start, end: region.end, outputName }
+      );
+
+
     }
 
-    await window.ElectronAPI.runMergeAndClean(allSegmentFileNames);
-    console.log("✅ Native Electron processing complete.");
+    const finalPath = await window.ElectronAPI.runMergeAndClean(allSegmentFileNames);
+    console.log("✅ Native Electron processing complete. Final path:", finalPath);
+
+    if (finalPath) {
+      displayMergedVideoFromPath(finalPath);
+    }
   } else {
     console.log("🌐 Detected Web — using ffmpeg.wasm");
 
@@ -990,6 +1330,8 @@ async function cutVideo() {
     let fullOutputBuffers = [];
 
     async function initFFmpeg() {
+      console.warn("inside initFFmpeg");
+
       const { createFFmpeg } = window.FFmpegLib;
       ffmpeg = createFFmpeg({ log: true });
       await ffmpeg.load({
@@ -1093,7 +1435,34 @@ async function cutVideo() {
     "✅ Done! You can now concatenate the parts or download scripts.";
 }
 
+function displayMergedVideoFromPath(filePath) {
+  console.warn("inside displayMergedVideoFromPath");
+
+  const videoPreview = document.querySelector("#videoPreview");
+
+  videoPreview.src = filePath;
+  videoPreview.style.display = "inline-block";
+  downloadVideoBtn.style.display = "inline-block";
+  copyBtnBASH.style.display = "inline-block";
+  copyBtnPS.style.display = "inline-block";
+
+  title.innerText = "Done! Consider donating ❤️";
+
+  downloadVideoBtn.onclick = () => {
+    const a = document.createElement("a");
+    a.href = filePath;
+    a.download = "final_output.mp4";
+    a.click();
+  };
+
+  scrollToBottomWithDelay();
+  console.log("✅ Final video loaded from disk:", filePath);
+}
+
+
 async function concatSegments(fileNames, outputFileName = "final.mp4") {
+  console.warn("inside concatSegments");
+
   await ffmpeg.writeFile(
     "list.txt",
     fileNames.map((name) => `file '${name}'`).join("\n")
@@ -1115,18 +1484,22 @@ async function concatSegments(fileNames, outputFileName = "final.mp4") {
 }
 
 async function scrollToBottomWithDelay(duration = 2000) {
+  console.warn("inside scrollToBottomWithDelay");
   setTimeout(() => {
     scroll(duration);
   }, 1000);
 }
 
 function scroll(duration) {
+  console.warn("inside scroll");
   const start = window.scrollY;
   const end = document.documentElement.scrollHeight - window.innerHeight;
   const distance = end - start;
   const startTime = performance.now();
 
   function step(currentTime) {
+    console.warn("inside step");
+
     const elapsed = currentTime - startTime;
     const progress = Math.min(elapsed / duration, 1); // cap at 1
     const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
@@ -1178,7 +1551,11 @@ document.addEventListener("DOMContentLoaded", () => {
 document
   .getElementById("invert")
   .addEventListener("click", invertSilentRegions);
+
+
 function invertSilentRegions() {
+  console.warn("inside invertSilentRegions");
+
   if (!silentRegions || silentRegions.length === 0) {
     alert("No silent regions to invert.");
     return;
@@ -1186,6 +1563,9 @@ function invertSilentRegions() {
 
   const nonSilentRegions = [];
   let prevEnd = 0;
+
+  const totalDuration =
+    (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
 
   for (let i = 0; i < silentRegions.length; i++) {
     const region = silentRegions[i];
@@ -1195,9 +1575,8 @@ function invertSilentRegions() {
     prevEnd = region.end;
   }
 
-  // Final region, if any audio left at the end
-  if (prevEnd < audioBuffer.duration) {
-    nonSilentRegions.push({ start: prevEnd, end: audioBuffer.duration });
+  if (prevEnd < totalDuration) {
+    nonSilentRegions.push({ start: prevEnd, end: totalDuration });
   }
 
   silentRegions = nonSilentRegions;
@@ -1207,8 +1586,8 @@ function invertSilentRegions() {
 }
 
 function autoAdjustThresholdSlider() {
-  const originalMin = 0;
-  const originalMax = 100;
+  console.warn("inside function autoAdjustThresholdSlider() ");
+
   const step = 0.5;
 
   const savedShrink = +shrinkSlider.value;
@@ -1227,7 +1606,10 @@ function autoAdjustThresholdSlider() {
     ) {
       thresholdSlider.value = val;
       handleThresholdChange(); // triggers markSilentRegions
-      const originalDuration = audioBuffer.duration || 0;
+
+      const originalDuration =
+        (audioBuffer && audioBuffer.duration) || wavesurfer?.getDuration() || 0;
+
 
       let totalSilence = 0;
       for (const region of silentRegions) {
@@ -1268,6 +1650,6 @@ function autoAdjustThresholdSlider() {
 
   handleThresholdChange(); // reapply current threshold
   console.log(
-    `Threshold range adjusted: ${thresholdSlider.min}% â€“ ${thresholdSlider.max}%`
+    `Threshold range adjusted: ${thresholdSlider.min} - ${thresholdSlider.max}%`
   );
 }
