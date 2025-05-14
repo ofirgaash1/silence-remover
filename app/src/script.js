@@ -63,7 +63,7 @@ const thresholdLine = document.getElementById("thresholdLine");
 const waveform = document.getElementById("waveform");
 
 thresholdSlider.addEventListener("input", updateThresholdLine);
-
+let wave = null;
 
 function updateThresholdLine() {
   const raw = parseFloat(thresholdSlider.value) / 100;
@@ -351,9 +351,10 @@ async function handleFile(fileOrPath) {
 
     const filePath = fileOrPath.path;
     window.uploadedFile = { path: filePath }; // ✅ Set this immediately
-    const sampleRate = 44100;
+    const sampleRate = 220.5;
 
     // ✅ Updated: Only return peaks and WAV path
+    title.innerHTML = "Computing peaks..."
     const { peaks, normalizedPath } = await window.ElectronAPI.extractWaveformPeaks(filePath);
 
     // Sanity check
@@ -397,7 +398,7 @@ async function handleFile(fileOrPath) {
     });
 
     // Step 5: Store file reference
-    
+
     window.uploadedFile = { path: filePath };
     console.log("✅ Normalized audio loaded and visualized");
     handleThresholdChange()
@@ -497,17 +498,6 @@ function initializeWaveSurfer(backend = "WebAudio") {
 }
 
 
-
-
-
-
-
-
-
-
-
-
-
 let playState = {
   isPlaying: false,
   stopRequested: false,
@@ -534,107 +524,76 @@ function findNextNonSilentTime(time) {
   return null;
 }
 
-function startLiveNonSilentPlayback() {
-  console.log("🧠 Starting real-time non-silent playback");
 
+
+let followScroll = true;
+
+function startScrollFollowLoop() {
+  if (!followScroll) return;
+
+  const currentTime = wavesurfer.getCurrentTime();
+  const duration = wavesurfer.getDuration() || 1;
+  const scrollable = document.querySelector("#waveform wave");
+  const containerWidth = scrollable.clientWidth;
+  const pxPerSec = scrollable.scrollWidth / duration;
+  const playheadPx = currentTime * pxPerSec;
+
+  const targetScroll = playheadPx - containerWidth / 2;
+  const scrollDelta = targetScroll - scrollable.scrollLeft;
+
+  // Only move if there's a noticeable difference
+  if (Math.abs(scrollDelta) > 2) {
+    scrollable.scrollLeft += scrollDelta * 0.15;
+  }
+
+  requestAnimationFrame(startScrollFollowLoop);
+}
+
+
+function startLiveNonSilentPlayback(wave) {
   playState.stopRequested = false;
   playState.isPlaying = true;
   updatePlayButtonUI("stop");
-
   wavesurfer.play();
 
+  // Start interval for silence skipping
   playState.intervalId = setInterval(() => {
     if (playState.stopRequested) {
       console.log("🛑 Stop requested — stopping");
       clearInterval(playState.intervalId);
+      followScroll = false;
       wavesurfer.stop();
       playState.isPlaying = false;
       updatePlayButtonUI("play");
       return;
     }
 
-    const current = wavesurfer.getCurrentTime();
+    const currentTime = wavesurfer.getCurrentTime();
 
-    if (isTimeInSilentRegion(current)) {
-      const skipTo = findNextNonSilentTime(current);
+    if (isTimeInSilentRegion(currentTime)) {
+      const skipTo = findNextNonSilentTime(currentTime);
       if (skipTo !== null) {
-        console.log(`⏭️ Skipping silence at ${current.toFixed(2)} → ${skipTo.toFixed(2)}`);
+        console.log(`⏭️ Skipping silence at ${currentTime.toFixed(2)} → ${skipTo.toFixed(2)}`);
         wavesurfer.play(skipTo);
+        return;
       }
     }
-  }, 50); // check every 50ms
+
+  }, 50);
+
+  // Start smooth scroll follow
+  followScroll = true;
+  startScrollFollowLoop();
 }
 
 PlayNonSilent.addEventListener("click", () => {
   if (playState.isPlaying) {
     playState.stopRequested = true;
   } else {
-    startLiveNonSilentPlayback();
+    startLiveNonSilentPlayback(wave);
   }
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-async function loadFileInBrowser(file) {
-  console.warn("inside loadFileInBrowser()");
-
-  const reader = new FileReader();
-
-  reader.onprogress = (e) => {
-    if (e.lengthComputable) {
-      const percent = Math.round((e.loaded / e.total) * 100);
-      title.innerText = `Loading file... ${percent}%`;
-    }
-  };
-
-  reader.onloadstart = () => {
-    title.innerText = "Starting file load...";
-  };
-
-  reader.onload = async (e) => {
-    title.innerText = "Decoding audio...";
-    try {
-      const ctx = new AudioContext();
-      audioBuffer = await ctx.decodeAudioData(e.target.result);
-      title.innerText = "Audio decoded, normalizing...";
-      normalizeAudioBuffer(audioBuffer);
-      precomputedPeaks = computePeaks(audioBuffer);
-      autoAdjustThresholdSlider();
-      handleThresholdChange();
-      drawRegions();
-
-      const wave = initializeWaveSurfer();
-      setupZoomAndScrollHandlers(wave);
-      wavesurfer.loadDecodedBuffer(audioBuffer);
-      title.innerText = "Ready!";
-    } catch (err) {
-      title.innerText = `Error: ${err.message}`;
-      console.error("Audio decode error:", err);
-    }
-  };
-
-  reader.onerror = () => console.error("FileReader error:", reader.error);
-  reader.readAsArrayBuffer(file);
-}
 
 
 function computePeaks(buffer) {
@@ -688,21 +647,20 @@ function smoothScrollTo(el, targetScroll, duration = 1000) {
  * of the visible area, easing over 1 second.
  */
 function scrollToTimeSmooth(timeInSec) {
-  const wave = document.querySelector("#waveform wave");
-  if (!wavesurfer) return;
-  const pxPerSec = wavesurfer.params.minPxPerSec;
-  const targetPx = timeInSec * pxPerSec;
-  // center it:
-  const offset = wave.clientWidth / 2;
-  let scrollPos = targetPx - offset;
-  // clamp into valid range:
-  scrollPos = Math.max(
-    0,
-    Math.min(scrollPos, wave.scrollWidth - wave.clientWidth)
-  );
+  const container = document.querySelector("#waveform"); // scrollable element
+  if (!wavesurfer || !container) return;
 
-  smoothScrollTo(wave, scrollPos, 1000);
+  const pxPerSec = wavesurfer.params.minPxPerSec || container.scrollWidth / wavesurfer.getDuration();
+  const targetPx = timeInSec * pxPerSec;
+
+  const offset = container.clientWidth / 2;
+  let scrollPos = targetPx - offset;
+
+  scrollPos = Math.max(0, Math.min(scrollPos, container.scrollWidth - container.clientWidth));
+
+  smoothScrollTo(container, scrollPos, 1000); // 1000ms = 1 second scroll
 }
+
 
 // Usage: jumps in smoothly to 12.3 s
 scrollToTimeSmooth(12.3);

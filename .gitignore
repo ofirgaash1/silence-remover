@@ -23,3 +23,7 @@ silence-remover/node_modules/
 *.njsproj
 *.sln
 *.sw?
+silence-cutter-desktop/normalized_output.wav
+silence-cutter-desktop/normalized_audio.f32
+silence-cutter-desktop/final_output.mp4
+silence-cutter-desktop/bin/ffmpeg.exe
