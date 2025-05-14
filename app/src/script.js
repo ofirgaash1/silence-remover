@@ -325,14 +325,34 @@ fileInput.addEventListener("change", (e) => {
 
 
 
+function showLargeFileWarning() {
+  if (document.getElementById("large-file-warning")) return; // prevent duplicates
 
+  const warning = document.createElement("div");
+  warning.id = "large-file-warning";
+  warning.style.cssText = `
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeeba;
+    padding: 12px;
+    font-size: 15px;
+    border-radius: 6px;
+    margin-top: 10px;
+    text-align: center;
+  `;
 
+  warning.innerHTML = `
+    ⚠️ This file is very large and may not process well in your browser.<br>
+    <a href="https://example.com/download" target="_blank" style="color:#004085; text-decoration:underline;">
+      Click here to download the desktop version of Silence Cutter
+    </a>.
+  `;
 
-
-
-
-
-
+  const title = document.getElementById("title");
+  if (title && title.parentNode) {
+    title.parentNode.insertBefore(warning, title.nextSibling);
+  }
+}
 
 
 
@@ -344,6 +364,11 @@ async function handleFile(fileOrPath) {
   if (!fileOrPath) return;
 
   const isElectron = !!window.ElectronAPI;
+
+  if (!isElectron && fileOrPath.size && fileOrPath.size >= 700 * 1024 * 1024) {
+    showLargeFileWarning();
+  }
+
   resetUIState();
 
   if (isElectron && fileOrPath.path) {
@@ -463,7 +488,7 @@ async function handleFile(fileOrPath) {
 
 function resetUIState() {
   console.warn("inside resetUIState()");
-
+  updatePlayButtonUI("start")
   if (wavesurfer) {
     wavesurfer.destroy();
     wavesurfer = null;
@@ -493,7 +518,11 @@ function initializeWaveSurfer(backend = "WebAudio") {
     autoCenter: false,
     plugins: [WaveSurfer.regions.create({})],
   });
-
+  wavesurfer.on("finish", () => {
+    console.log("✅ Playback finished");
+    playState.isPlaying = false;
+    updatePlayButtonUI("play");
+  });
   return document.querySelector("#waveform wave");
 }
 
@@ -577,19 +606,38 @@ function startLiveNonSilentPlayback(wave) {
         wavesurfer.play(skipTo);
         return;
       }
+
     }
-
   }, 50);
-
+  ;
   // Start smooth scroll follow
   followScroll = true;
   startScrollFollowLoop();
 }
 
+let textState = true
 PlayNonSilent.addEventListener("click", () => {
+  if (document.getElementById("waveform").style.display == "none") {
+    console.log("no waveform");
+    if (textState) {
+      console.log("was playing")
+      updatePlayButtonUI("stop")
+      textState = false
+    }
+    else {
+      console.log("was stopped")
+      updatePlayButtonUI("start")
+      textState = true
+    }
+    return
+  }
+  console.log("yes waveform");
+
   if (playState.isPlaying) {
+    console.log("was playing");
     playState.stopRequested = true;
   } else {
+    console.log("was stopped");
     startLiveNonSilentPlayback(wave);
   }
 });
@@ -642,28 +690,48 @@ function smoothScrollTo(el, targetScroll, duration = 1000) {
   requestAnimationFrame(frame);
 }
 
-/**
- * Scrolls the waveform so that `timeInSec` lands in the center
- * of the visible area, easing over 1 second.
- */
+let scrollTargetPx = null;
+let scrollLoopActive = false;
+
 function scrollToTimeSmooth(timeInSec) {
-  const container = document.querySelector("#waveform"); // scrollable element
+  const container = document.querySelector("#waveform wave");
   if (!wavesurfer || !container) return;
 
   const pxPerSec = wavesurfer.params.minPxPerSec || container.scrollWidth / wavesurfer.getDuration();
   const targetPx = timeInSec * pxPerSec;
 
   const offset = container.clientWidth / 2;
-  let scrollPos = targetPx - offset;
+  scrollTargetPx = Math.max(0, Math.min(targetPx - offset, container.scrollWidth - container.clientWidth));
 
-  scrollPos = Math.max(0, Math.min(scrollPos, container.scrollWidth - container.clientWidth));
-
-  smoothScrollTo(container, scrollPos, 1000); // 1000ms = 1 second scroll
+  if (!scrollLoopActive) {
+    scrollLoopActive = true;
+    requestAnimationFrame(smoothScrollLoop);
+  }
 }
 
+function smoothScrollLoop() {
+  const container = document.querySelector("#waveform wave");
+  if (!container || scrollTargetPx === null) return;
 
-// Usage: jumps in smoothly to 12.3 s
-scrollToTimeSmooth(12.3);
+  const currentScroll = container.scrollLeft;
+  const delta = scrollTargetPx - currentScroll;
+
+  // Scroll easing factor (adjust for speed)
+  const easeFactor = 0.2;
+
+  // Apply movement
+  container.scrollLeft += delta * easeFactor;
+
+  // If we're close to the target, snap and stop
+  if (Math.abs(delta) < 1) {
+    container.scrollLeft = scrollTargetPx;
+    scrollLoopActive = false;
+    return;
+  }
+
+  requestAnimationFrame(smoothScrollLoop);
+}
+
 
 function handleThresholdChange() {
   //console.warn("inside handleThresholdChange()");

@@ -70,14 +70,20 @@ button:hover {
 /* Make the <wave> show a hand cursor */
 wave {
   cursor: grab;
-  user-select: none;         /* so you don’t accidentally select text */
-  overflow-x: auto;          /* allow horizontal scrolling */
+  user-select: none;
+  /* so you don’t accidentally select text */
+  overflow-x: auto;
+  /* allow horizontal scrolling */
   overflow-y: hidden;
   /* hide the native scrollbar */
-  scrollbar-width: none;     /* Firefox */
-  -ms-overflow-style: none;  /* IE10+ */
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE10+ */
 }
-wave::-webkit-scrollbar {     /* Chrome/Safari/Edge */
+
+wave::-webkit-scrollbar {
+  /* Chrome/Safari/Edge */
   height: 0;
 }
 
@@ -155,6 +161,12 @@ textarea {
   margin: 0 5px;
 }
 
+#Play-Non-Silent {
+  background-color: #3e5126e3;
+  color: white;
+  margin: 0 5px;
+}
+
 .format-controls .selected {
   background-color: #3498db;
   color: white;
@@ -178,17 +190,19 @@ textarea {
   padding: 15px;
   border-radius: 10px;
   max-width: 600px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
 
 video {
 
   max-width: 250px;
-  height: auto; /* preserve aspect ratio */
+  height: auto;
+  /* preserve aspect ratio */
   border-radius: 10px;
   display: block;
-  margin: 20px auto 0 auto; /* center horizontally */
+  margin: 20px auto 0 auto;
+  /* center horizontally */
   background: black;
 }
 
@@ -207,6 +221,7 @@ video {
 #copyBtnPS {
   display: none;
 }
+
 #copyBtnBASH {
   display: none;
 }
@@ -219,6 +234,3 @@ video {
 #invert {
   background-color: #7f8c8d;
 }
-
-
-
