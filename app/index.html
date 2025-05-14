@@ -7,9 +7,21 @@
   <link rel="stylesheet" href="./src/style.css">
 </head>
 
-<body>
 
-  <h1 id="title">Audio & Video Silence Cutter</h1>
+<body>
+<form action="https://www.paypal.com/donate" method="post" target="_top" class="donate-form">
+  <input type="hidden" name="hosted_button_id" value="MRJF9A83YR2BE" />
+  <input type="image"
+    src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif"
+    border="0"
+    name="submit"
+    title="PayPal - The safer, easier way to pay online!"
+    alt="Donate with PayPal button" />
+</form>
+
+<h1 id="title">Audio & Video Silence Cutter</h1>
+
+
 
   <!-- Drag & Drop or Browse Area -->
   <div id="drop-zone" class="drop-zone">
@@ -24,8 +36,13 @@
     <div id="waveform" class="waveform" style="display:none;"></div>
     <div id="thresholdLine"></div>
   </div>
-  <button id="Play-Non-Silent">▶️ Play Non-Silent</button>
+
+  <!-- <button id="Fullscreen">⛶ Fullscreen</button> -->
   <!-- Sliders and Controls -->
+
+
+
+
   <div class="controls">
 
     <div class="control-group">
@@ -59,8 +76,9 @@
     </div>
 
     <div class="button-row">
-      <button id="cutAudio">Create Audio</button>
-      <button id="cutVideoBtn">Create Video</button>
+        <button id="Play-Non-Silent">▶️ Play </button>
+      <button id="cutAudio">Export Audio</button>
+      <button id="cutVideoBtn">Export Video</button>
       <button id="invert">Invert</button>
     </div>
 
@@ -68,11 +86,11 @@
 
   <!-- Statistics Panel -->
   <div id="statsPanel">Time saved: 0s - 0% shorter - 0 silence regions</div>
-  <form action="https://www.paypal.com/donate" method="post" target="_top">
-    <input type="hidden" name="hosted_button_id" value="MRJF9A83YR2BE" />
-    <input type="image" src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif" border="0" name="submit"
-      title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
-  </form>
+
+
+  <section id="videoPreview2container">
+    <video id="videoPreview2" muted style="pointer-events: none; display: none;" width="100%"></video>
+  </section>
   <!-- Audio Preview -->
 
   <audio id="audioPreview" controls></audio>
@@ -80,8 +98,6 @@
   <button id="AudioDownloadBtn" class="download-btn">Download Audio</button>
 
   <!-- Video Preview -->
-  <h3 id=vidTitle>Video Preview:</h3>
-  <video id="videoPreview" controls style="display:none; width:100%;"></video>
   <br>
   <button id="downloadVideoBtn" class="download-btn">Download Video</button>
 

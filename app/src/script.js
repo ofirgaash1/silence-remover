@@ -54,13 +54,16 @@ const downloadBtn = document.getElementById("AudioDownloadBtn");
 const cutVideoBtn = document.getElementById("cutVideoBtn");
 const downloadVideoBtn = document.getElementById("downloadVideoBtn");
 const statsPanel = document.getElementById("statsPanel");
-const vidTitle = document.getElementById("vidTitle");
+// const vidTitle = document.getElementById("vidTitle");
 const zoomSlider = document.getElementById("zoomSlider");
 const zoomInput = document.getElementById("zoomInput");
-
 const thresholdSlider = document.getElementById("thresholdSlider");
 const thresholdLine = document.getElementById("thresholdLine");
 const waveform = document.getElementById("waveform");
+const videoElement = document.getElementById("videoPreview2");
+//const Fullscreen = document.getElementById("Fullscreen");
+const videoElementContainer = document.getElementById("videoPreview2container");
+
 
 thresholdSlider.addEventListener("input", updateThresholdLine);
 let wave = null;
@@ -78,7 +81,7 @@ function updateThresholdLine() {
 }
 
 function setupUIEvents() {
-  vidTitle.style.display = "none";
+  // vidTitle.style.display = "none";
   audioPreview.style.display = "none";
 
   browseBtn.addEventListener("click", triggerFileLoad);
@@ -214,10 +217,6 @@ function setupZoomAndScrollHandlers(wave) {
   let lastX = 0;
   let dragMomentumId = null;
 
-  let wheelVelocity = 0;
-  let targetWheelVelocity = 0;
-  let wheelMomentumId = null;
-  let wheelTimeout = null;
 
   wave.addEventListener("mousedown", (e) => {
     isDown = true;
@@ -254,44 +253,49 @@ function setupZoomAndScrollHandlers(wave) {
     dragMomentumId = requestAnimationFrame(dragMomentum);
   }
 
-  wave.addEventListener(
-    "wheel",
-    (e) => {
-      e.preventDefault();
+  // let wheelVelocity = 0;
+  // let targetWheelVelocity = 0;
+  // let wheelMomentumId = null;
+  // let wheelTimeout = null;
 
-      const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
-      targetWheelVelocity += scaledDelta;
+  // wave.addEventListener(
+  //   "wheel",
+  //   (e) => {
+  //     e.preventDefault();
 
-      clearTimeout(wheelTimeout);
-      if (!wheelMomentumId) wheelMomentum();
+  //     const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
+  //     targetWheelVelocity += scaledDelta;
 
-      wheelTimeout = setTimeout(() => {
-        targetWheelVelocity = 0;
-      }, WHEEL_IDLE_TIMEOUT);
-    },
-    { passive: false }
-  );
+  //     clearTimeout(wheelTimeout);
+  //     if (!wheelMomentumId) wheelMomentum();
 
-  function wheelMomentum() {
-    if (targetWheelVelocity !== 0) {
-      wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
-    } else {
-      wheelVelocity *= WHEEL_DECELERATION;
-    }
+  //     wheelTimeout = setTimeout(() => {
+  //       targetWheelVelocity = 0;
+  //     }, WHEEL_IDLE_TIMEOUT);
+  //   },
+  //   { passive: false }
+  // );
 
-    wave.scrollLeft += wheelVelocity;
+  // function wheelMomentum() {
+  //   if (targetWheelVelocity !== 0) {
+  //     wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
+  //   } else {
+  //     wheelVelocity *= WHEEL_DECELERATION;
+  //   }
 
-    if (
-      Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD ||
-      Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD
-    ) {
-      wheelMomentumId = requestAnimationFrame(wheelMomentum);
-    } else {
-      wheelVelocity = 0;
-      targetWheelVelocity = 0;
-      wheelMomentumId = null;
-    }
-  }
+  //   wave.scrollLeft += wheelVelocity;
+
+  //   if (
+  //     Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD ||
+  //     Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD
+  //   ) {
+  //     wheelMomentumId = requestAnimationFrame(wheelMomentum);
+  //   } else {
+  //     wheelVelocity = 0;
+  //     targetWheelVelocity = 0;
+  //     wheelMomentumId = null;
+  //   }
+  // }
 }
 
 
@@ -374,7 +378,8 @@ async function handleFile(fileOrPath) {
 
   if (isElectron && fileOrPath.path) {
     console.log("⚡ Electron mode enabled");
-
+    videoElement.src = fileOrPath.path; // In Electron, local paths work
+    videoElement.style.display = "block";
     const filePath = fileOrPath.path;
     window.uploadedFile = { path: filePath }; // ✅ Set this immediately
     const sampleRate = 220.5;
@@ -438,6 +443,9 @@ async function handleFile(fileOrPath) {
 
   // 🌐 Browser path
   const file = fileOrPath;
+  const url = URL.createObjectURL(file);
+  videoElement.src = url;
+  videoElement.style.display = "block";
 
 
   // ✅ Fix: Store the file for later use
@@ -499,7 +507,7 @@ function resetUIState() {
   silentRegions = [];
   lastBlob = null;
   audioPreview.src = "";
-  videoPreview.src = "";
+//  videoPreview.src = "";
 
   dropZone.style.display = "none";
   waveformDiv.style.display = "block";
@@ -528,6 +536,13 @@ function initializeWaveSurfer(backend = "WebAudio") {
 }
 
 
+
+
+////////////////////////////
+// PLAY NON-SILENT CODE AREA
+////////////////////////////
+
+
 let playState = {
   isPlaying: false,
   stopRequested: false,
@@ -537,7 +552,7 @@ let playState = {
 const PlayNonSilent = document.getElementById("Play-Non-Silent");
 
 function updatePlayButtonUI(mode) {
-  PlayNonSilent.innerText = mode === "stop" ? "⏹ Stop" : "▶️ Play Non-Silent";
+  PlayNonSilent.innerText = mode === "stop" ? "⏹ Stop" : "▶️ Play";
 }
 
 function isTimeInSilentRegion(time) {
@@ -553,8 +568,6 @@ function findNextNonSilentTime(time) {
   }
   return null;
 }
-
-
 
 let followScroll = true;
 
@@ -579,7 +592,6 @@ function startScrollFollowLoop() {
   requestAnimationFrame(startScrollFollowLoop);
 }
 
-
 function startLiveNonSilentPlayback(wave) {
   playState.stopRequested = false;
   playState.isPlaying = true;
@@ -589,6 +601,7 @@ function startLiveNonSilentPlayback(wave) {
   // Start interval for silence skipping
   playState.intervalId = setInterval(() => {
     if (playState.stopRequested) {
+      videoElement.pause()
       console.log("🛑 Stop requested — stopping");
       clearInterval(playState.intervalId);
       followScroll = false;
@@ -603,6 +616,7 @@ function startLiveNonSilentPlayback(wave) {
     if (isTimeInSilentRegion(currentTime)) {
       const skipTo = findNextNonSilentTime(currentTime);
       if (skipTo !== null) {
+        playVideoFrom(skipTo)
         console.log(`⏭️ Skipping silence at ${currentTime.toFixed(2)} → ${skipTo.toFixed(2)}`);
         wavesurfer.play(skipTo);
         return;
@@ -616,9 +630,8 @@ function startLiveNonSilentPlayback(wave) {
   startScrollFollowLoop();
 }
 
-let textState = true
-PlayNonSilent.addEventListener("click", () => {
-  if (document.getElementById("waveform").style.display == "none") {
+function playPause() {
+    if (document.getElementById("waveform").style.display == "none") {
     console.log("no waveform");
     if (textState) {
       console.log("was playing")
@@ -641,7 +654,34 @@ PlayNonSilent.addEventListener("click", () => {
     console.log("was stopped");
     startLiveNonSilentPlayback(wave);
   }
+}
+
+let textState = true
+
+
+videoElementContainer.addEventListener("click", () => {
+  playPause();
 });
+
+PlayNonSilent.addEventListener("click", () => {
+  playPause();
+});
+
+function playVideoFrom(seconds) {
+  videoElement.currentTime = seconds;
+  videoElement.removeAttribute("controls");
+  videoElement.play();
+  videoElement.removeAttribute("controls");
+  videoElement.muted = true;
+  videoElement.removeAttribute("controls");
+}
+
+
+// Fullscreen.addEventListener("click", () => {toggleFullscreen()});
+
+//////////////////////////////
+// END OF PLAY NON-SILENT CODE
+//////////////////////////////
 
 
 
@@ -664,32 +704,6 @@ function computePeaks(buffer) {
   return peaks;
 }
 
-function easeInOutQuad(t) {
-  return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-}
-
-/**
- * Smoothly animates `el.scrollLeft` from its current value to `targetScroll`
- * over `duration` milliseconds, using an ease-in-out curve.
- */
-function smoothScrollTo(el, targetScroll, duration = 1000) {
-  const startScroll = el.scrollLeft;
-  const change = targetScroll - startScroll;
-  const startTime = performance.now();
-
-  function frame(now) {
-    const elapsed = now - startTime;
-    const progress = Math.min(elapsed / duration, 1);
-    const eased = easeInOutQuad(progress);
-    el.scrollLeft = startScroll + change * eased;
-
-    if (progress < 1) {
-      requestAnimationFrame(frame);
-    }
-  }
-
-  requestAnimationFrame(frame);
-}
 
 let scrollTargetPx = null;
 let scrollLoopActive = false;
@@ -1261,10 +1275,10 @@ function displayMergedVideo(blob) {
   console.warn("inside displayMergedVideo");
 
   const url = URL.createObjectURL(blob);
-  const videoPreview = document.querySelector("#videoPreview");
+  //const videoPreview = document.querySelector("#videoPreview");
 
-  videoPreview.src = url;
-  videoPreview.style.display = "inline-block";
+  // videoPreview.src = url;
+  // videoPreview.style.display = "inline-block";
   downloadVideoBtn.style.display = "inline-block";
   copyBtnBASH.style.display = "inline-block";
   copyBtnPS.style.display = "inline-block";
@@ -1465,10 +1479,10 @@ async function cutVideo() {
 function displayMergedVideoFromPath(filePath) {
   console.warn("inside displayMergedVideoFromPath");
 
-  const videoPreview = document.querySelector("#videoPreview");
+  // const videoPreview = document.querySelector("#videoPreview");
 
-  videoPreview.src = filePath;
-  videoPreview.style.display = "inline-block";
+  // videoPreview.src = filePath;
+  // videoPreview.style.display = "inline-block";
   downloadVideoBtn.style.display = "inline-block";
   copyBtnBASH.style.display = "inline-block";
   copyBtnPS.style.display = "inline-block";
