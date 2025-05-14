@@ -8,7 +8,7 @@ window.FFmpegLib = {
   },
 };
 
-// âœ… wait until global libs are defined, then call main()
+// … wait until global libs are defined, then call main()
 
 const delay = (ms) => new Promise((res) => setTimeout(res, ms));
 
@@ -131,7 +131,7 @@ function setupUIEvents() {
         b.innerText = b.dataset.format.toUpperCase();
       });
       btn.classList.add("selected");
-      btn.innerText = `${btn.dataset.format.toUpperCase()} âœ“`;
+      btn.innerText = `${btn.dataset.format.toUpperCase()} ✓`;
       outputFormat = btn.dataset.format;
     });
   });
@@ -1016,7 +1016,7 @@ async function cutAudio() {
         : await encodeWAVAsync(newBuffer); // Modified to be async
 
     audioPreview.src = URL.createObjectURL(lastBlob);
-    title.innerText = "Done! Consider donating â¤";
+    title.innerText = "Done! Consider donating ❤";
     audioPreview.style.display = "inline-block";
     downloadBtn.style.display = "inline-block";
     scrollToBottomWithDelay();
@@ -1660,10 +1660,10 @@ function autoAdjustThresholdSlider() {
     }
   };
 
-  // Step 1: scan from 0 â†’ up
+  // Step 1: scan from 0 up
   scan(0, 100, 1);
 
-  // Step 2: scan from 100 â†’ down
+  // Step 2: scan from 100 down
   scan(100, 0, -1);
 
   // Update slider bounds
