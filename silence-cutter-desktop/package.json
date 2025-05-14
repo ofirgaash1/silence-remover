@@ -23,7 +23,7 @@
   },
   "build": {
     "appId": "com.ofirgaash.silenceremover",
-    "productName": "Silence Cutter",
+    "productName": "Silence Remover",
     "asar": true,
     "files": [
       "main.js",

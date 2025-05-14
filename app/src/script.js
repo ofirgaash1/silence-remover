@@ -334,16 +334,16 @@ function showLargeFileWarning() {
     background: #fff3cd;
     color: #856404;
     border: 1px solid #ffeeba;
-    padding: 12px;
-    font-size: 15px;
+    padding: 32px;
+    font-size: 18px;
     border-radius: 6px;
-    margin-top: 10px;
+    margin-top: 20px;
     text-align: center;
   `;
 
   warning.innerHTML = `
-    ⚠️ This file is very large and may not process well in your browser.<br>
-    <a href="https://example.com/download" target="_blank" style="color:#004085; text-decoration:underline;">
+    ⚠️ This file is large and will not process well in your browser.<br>
+    <a href="https://mega.nz/folder/PBtzhZqa#EcOfYukj90PzeAYlBa4LbA" target="_blank" style="color:#004085; text-decoration:underline;">
       Click here to download the desktop version of Silence Cutter
     </a>.
   `;
@@ -367,6 +367,7 @@ async function handleFile(fileOrPath) {
 
   if (!isElectron && fileOrPath.size && fileOrPath.size >= 700 * 1024 * 1024) {
     showLargeFileWarning();
+    return
   }
 
   resetUIState();
