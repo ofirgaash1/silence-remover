@@ -154,20 +154,47 @@ function setupUIEvents() {
 }
 
 function normalizeAudioBuffer(buffer) {
-  const data = buffer.getChannelData(0);
-  let max = 0;
-  console.log(data.length);
+  const numChannels = buffer.numberOfChannels;
+  const length = buffer.length;
 
-  for (let i = 0; i < data.length; i++) {
-    const abs = Math.abs(data[i]);
+  // Step 1: Sum all channels to mono
+  const mono = new Float32Array(length);
+  for (let ch = 0; ch < numChannels; ch++) {
+    const channelData = buffer.getChannelData(ch);
+    for (let i = 0; i < length; i++) {
+      mono[i] += channelData[i];
+    }
+  }
+
+  // Step 2: Average to mono
+  for (let i = 0; i < length; i++) {
+    mono[i] /= numChannels;
+  }
+
+  // Step 3: Find peak
+  let max = 0;
+  for (let i = 0; i < length; i++) {
+    const abs = Math.abs(mono[i]);
     if (abs > max) max = abs;
   }
-  if (max === 0 || max === 1) return;
+
+  if (max === 0 || max === 1) return; // already normalized or silent
+
+  // Step 4: Normalize
   const multiplier = 1.0 / max;
-  for (let i = 0; i < data.length; i++) {
-    data[i] *= multiplier;
+  for (let i = 0; i < length; i++) {
+    mono[i] *= multiplier;
+  }
+
+  // Step 5: Write normalized mono back to all channels
+  for (let ch = 0; ch < numChannels; ch++) {
+    const channelData = buffer.getChannelData(ch);
+    for (let i = 0; i < length; i++) {
+      channelData[i] = mono[i];
+    }
   }
 }
+
 
 function setupZoomAndScrollHandlers(wave) {
   const WHEEL_SENSITIVITY = 1 / 8;
@@ -473,9 +500,9 @@ async function handleFile(fileOrPath) {
       audioBuffer = await ctx.decodeAudioData(arrayBuffer);
 
       title.innerText = "Normalizing...";
-      normalizeAudioBuffer(audioBuffer);
+      normalizeAudioBuffer(audioBuffer); // in-place
+      precomputedPeaks = computePeaks(audioBuffer.getChannelData(0), audioBuffer.sampleRate);
 
-      precomputedPeaks = computePeaks(audioBuffer);
 
       const wave = initializeWaveSurfer();
       setupZoomAndScrollHandlers(wave);
@@ -519,6 +546,7 @@ function resetUIState() {
 function initializeWaveSurfer(backend = "WebAudio") {
   console.log("🛠️ Creating WaveSurfer with backend:", backend);
   wavesurfer = WaveSurfer.create({
+    cursorWidth: 1.5,
     container: waveformDiv,
     height: 128,
     scrollParent: false,
@@ -606,7 +634,7 @@ function startLiveNonSilentPlayback(wave) {
       console.log("🛑 Stop requested — stopping");
       clearInterval(playState.intervalId);
       followScroll = false;
-      wavesurfer.stop();
+      wavesurfer.pause();
       playState.isPlaying = false;
       updatePlayButtonUI("play");
       return;
@@ -706,28 +734,29 @@ async function updateVideoSize(bigVideo) {
   video.style.height = 'auto';
 }
 
-
-
-
-
-function computePeaks(buffer) {
-  console.warn("inside computePeaks(buffer)");
-
-  const originalDuration = audioBuffer ? audioBuffer.duration || 0 : 0;
-  const data = buffer.getChannelData(0);
-  const sampleRate = buffer.sampleRate;
+function computePeaks(monoArray, sampleRate) {
+  const chunkDuration = 0.005; // 5ms
+  const samplesPerChunk = Math.floor(sampleRate * chunkDuration);
+  const length = monoArray.length;
   const peaks = [];
-  const numberOfPeaks = 250 * Math.floor(audioBuffer.duration); // desired peaks per second * number of seconds
 
-  const samplesPerChunk = Math.floor(data.length / numberOfPeaks);
-  for (let i = 0; i < data.length; i += samplesPerChunk) {
-    const slice = data.slice(i, i + samplesPerChunk);
-    const peak = Math.max(...slice.map(Math.abs));
+  for (let i = 0; i < length; i += samplesPerChunk) {
+    let max = 0;
+    const end = Math.min(i + samplesPerChunk, length);
+
+    for (let j = i; j < end; j++) {
+      const abs = Math.abs(monoArray[j]);
+      if (abs > max) max = abs;
+    }
+
     const time = i / sampleRate;
-    peaks.push({ time, peak });
+    peaks.push({ time, peak: max });
   }
+
   return peaks;
 }
+
+
 
 
 let scrollTargetPx = null;
