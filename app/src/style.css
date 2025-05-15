@@ -1,29 +1,60 @@
+:root {
+  --bg-color: #f0f4f8;
+  --text-color: #333;
+  --card-bg: #fff;
+  --primary: #2ecc71;
+  --primary-text: #fff;
+  --drop-zone-bg: #fff;
+  --drop-zone-border: #7f8c8d;
+  --threshold-line: rgba(0, 0, 0, 0.274);
+  --input-bg: #fff;
+  --input-border: #ccc;
+  --slider-track: #ddd;
+  --slider-thumb: #3498db;
+}
+
+body.dark-mode {
+  --bg-color: #121212;
+  --text-color: #e0e0e0;
+  --card-bg: #1e1e1e;
+  --primary: #27ae60;
+  --primary-text: #fff;
+  --drop-zone-bg: #1c1c1c;
+  --drop-zone-border: #555;
+  --threshold-line: rgba(255, 255, 255, 0.3);
+  --input-bg: #2a2a2a;
+  --input-border: #555;
+  --slider-track: #555;
+  --slider-thumb: #3498db;
+}
+
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   margin: 0px 0px;
-  background: #f0f4f8;
-  color: #333;
+  background: var(--bg-color);
+  color: var(--text-color);
   text-align: center;
+  transition: background 0.3s ease, color 0.3s ease;
 }
-#waveformContainer{
-    margin: 0px 10px;
+
+#waveformContainer {
+  margin: 0px 10px;
 }
+
 h1 {
   margin: 20px 10px;
   font-size: 2em;
-  color: #2c3e50;
-
+  color: var(--text-color);
 }
 
 .drop-zone {
-  
   display: flex;
   align-items: center;
   justify-content: center;
   height: 128px;
-  border: 2px dashed #7f8c8d;
+  border: 2px dashed var(--drop-zone-border);
   margin: 20px 10px;
-  background-color: #fff;
+  background-color: var(--drop-zone-bg);
   cursor: pointer;
   border-radius: 12px;
   transition: background-color 0.3s, border-color 0.3s;
@@ -40,7 +71,6 @@ h1 {
   margin-top: 8px;
 }
 
-
 .drop-zone.dragover {
   height: 128px;
   border-color: #3498db;
@@ -54,7 +84,9 @@ button {
   padding: 10px 20px;
   font-size: 16px;
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  background-color: var(--primary);
+  color: var(--primary-text);
 }
 
 button:hover {
@@ -66,29 +98,21 @@ button:hover {
   left: 0;
   width: 100%;
   height: 2px;
-  background-color: rgba(0, 0, 0, 0.274);
+  background-color: var(--threshold-line);
   pointer-events: none;
   display: none;
 }
 
-/* Make the <wave> show a hand cursor */
 wave {
-
   cursor: grab;
   user-select: none;
-  /* so you don’t accidentally select text */
   overflow-x: auto;
-  /* allow horizontal scrolling */
   overflow-y: hidden;
-  /* hide the native scrollbar */
   scrollbar-width: none;
-  /* Firefox */
   -ms-overflow-style: none;
-  /* IE10+ */
 }
 
 wave::-webkit-scrollbar {
-  /* Chrome/Safari/Edge */
   height: 0;
 }
 
@@ -96,8 +120,6 @@ wave.dragging {
   cursor: grabbing;
 }
 
-
-/* Chrome, Safari, Opera */
 .waveform-scroller::-webkit-scrollbar {
   height: 0;
 }
@@ -112,7 +134,6 @@ textarea {
 }
 
 #waveform {
-
   width: 100%;
   height: 128px;
   background-color: #dde1e7;
@@ -122,13 +143,14 @@ textarea {
 }
 
 .controls {
-
-  background: #fff;
+  background: var(--card-bg);
   border-radius: 12px;
   padding: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   max-width: 800px;
   margin: 0 auto;
+  color: var(--text-color);
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 .control-group {
@@ -154,19 +176,18 @@ textarea {
   border-radius: 6px;
   border: 1px solid #ccc;
 }
+#Play-Non-Silent {
+  background-color: #3e5126e3;
+  color: white;
+  margin: 0 5px;
+}
 
 .format-controls {
   margin: 20px 0;
 }
 
 .format-controls button {
-  background-color: #ecf0f1;
-  color: #333;
-  margin: 0 5px;
-}
-
-#Play-Non-Silent {
-  background-color: #3e5126e3;
+  background-color: #b0b0b0;
   color: white;
   margin: 0 5px;
 }
@@ -181,29 +202,28 @@ textarea {
 }
 
 .button-row button {
-  background-color: #2ecc71;
-  color: white;
   margin: 5px;
 }
 
 #statsPanel {
   font-size: 18px;
   font-weight: bold;
-  background: #fff;
+  background: var(--card-bg);
   padding: 15px;
   border-radius: 10px;
   max-width: 600px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-    margin: 15px auto;
+  margin: 15px auto;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
 #videoPreview2container {
   display: none;
   justify-content: center;
   align-items: center;
-  width: 100%; /* new: take full width */
-  max-width: 17vw; /* or 100vw when expanded */
-  overflow: hidden; /* new: prevent overflow */
+  width: 100%;
+  max-width: 17vw;
+  overflow: hidden;
   max-height: calc(100vh - 100px);
   margin: 0 auto;
   background: black;
@@ -211,26 +231,21 @@ textarea {
   position: relative;
 }
 
-
 #videoPreview2 {
   display: block;
   max-width: 100%;
   max-height: 90vh;
-  width: 100%; /* scale with container */
+  width: 100%;
   height: auto;
   object-fit: contain;
   transition: width 0.8s ease, height 0.8s ease;
 }
 
-
-
-
-
 .donate-form {
   position: fixed;
   top: 10px;
   right: 10px;
-  z-index: 1000; /* make sure it stays above other UI */
+  z-index: 1000;
 }
 
 .download-btn {
@@ -245,19 +260,61 @@ textarea {
   background-color: #d35400;
 }
 
-#copyBtnPS {
-  display: none;
-}
-
+#copyBtnPS,
 #copyBtnBASH {
   display: none;
 }
 
 #waveform wave:first-child {
   color: #ffffff;
-
 }
 
 #invert {
   background-color: #7f8c8d;
+}
+
+.theme-toggle {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 1000;
+  cursor: pointer;
+  font-size: 24px;
+  background: var(--card-bg);
+  color: var(--text-color);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.slider-row input[type="number"] {
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  border: 1px solid var(--input-border);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+
+
+input[type="range"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    var(--slider-thumb) 0%,
+    var(--slider-thumb) var(--value, 50%),
+    var(--slider-track) var(--value, 50%),
+    var(--slider-track) 100%
+  );
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  transition: background 0.2s ease;
 }

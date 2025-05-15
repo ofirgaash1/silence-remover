@@ -9,17 +9,16 @@
 
 
 <body>
-<form action="https://www.paypal.com/donate" method="post" target="_top" class="donate-form">
-  <input type="hidden" name="hosted_button_id" value="MRJF9A83YR2BE" />
-  <input type="image"
-    src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif"
-    border="0"
-    name="submit"
-    title="PayPal - The safer, easier way to pay online!"
-    alt="Donate with PayPal button" />
-</form>
+  <div id="themeToggle" class="theme-toggle">
+  <span id="themeIcon">🌙</span> 
+</div>
+  <form action="https://www.paypal.com/donate" method="post" target="_top" class="donate-form">
+    <input type="hidden" name="hosted_button_id" value="MRJF9A83YR2BE" />
+    <input type="image" src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif" border="0" name="submit"
+      title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+  </form>
 
-<h1 id="title">Audio & Video Silence Cutter</h1>
+  <h1 id="title">Audio & Video Silence Cutter</h1>
 
 
 
@@ -76,8 +75,8 @@
     </div>
 
     <div class="button-row">
-        <button id="Play-Non-Silent">▶️ Play </button>
-        <button id="maximize"> Maximize Preview </button>
+      <button id="Play-Non-Silent">▶️ Play </button>
+      <button id="maximize"> Maximize Preview </button>
       <button id="cutAudio">Export Audio</button>
       <button id="cutVideoBtn">Export Video</button>
       <button id="invert">Invert</button>
@@ -89,9 +88,9 @@
   <div id="statsPanel">Time saved: 0s - 0% shorter - 0 silence regions</div>
 
 
-<section id="videoPreview2container">
-  <video id="videoPreview2" muted></video>
-</section>
+  <section id="videoPreview2container">
+    <video id="videoPreview2" muted></video>
+  </section>
 
 
   <audio id="audioPreview" controls></audio>
@@ -112,7 +111,49 @@
   <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
   <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
   <script type="module" src="./src/script.js"></script>
+  <script>
+    const body = document.body;
+    const toggleBtn = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
 
+    function applyTheme(mode) {
+      if (mode === 'dark') {
+        body.classList.add('dark-mode');
+        themeIcon.textContent = '☀️';
+      } else {
+        body.classList.remove('dark-mode');
+        themeIcon.textContent = '🌙';
+      }
+      localStorage.setItem('theme', mode);
+    }
+
+    // Detect preference
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+    if (savedTheme) {
+      applyTheme(savedTheme);
+    } else {
+      applyTheme(prefersDark ? 'dark' : 'light');
+    }
+
+    // Toggle handler
+    toggleBtn.addEventListener('click', () => {
+      const isDark = body.classList.contains('dark-mode');
+      applyTheme(isDark ? 'light' : 'dark');
+    });
+  </script>
+  <script>
+  const sliders = document.querySelectorAll('input[type="range"]');
+  sliders.forEach(slider => {
+    const updateBackground = () => {
+      const percentage = 100 * (slider.value - slider.min) / (slider.max - slider.min);
+      slider.style.setProperty('--value', `${percentage}%`);
+    };
+    slider.addEventListener('input', updateBackground);
+    updateBackground(); // initialize on load
+  });
+</script>
 </body>
 
 </html>
