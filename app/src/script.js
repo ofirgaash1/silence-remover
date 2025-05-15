@@ -380,13 +380,14 @@ async function handleFile(fileOrPath) {
     console.log("⚡ Electron mode enabled");
     videoElement.src = fileOrPath.path; // In Electron, local paths work
     videoElement.style.display = "block";
+    videoElementContainer.style.display = "flex";
     const filePath = fileOrPath.path;
     window.uploadedFile = { path: filePath }; // ✅ Set this immediately
     const sampleRate = 220.5;
 
     // ✅ Updated: Only return peaks and WAV path
     title.innerHTML = "Computing peaks..."
-    const { peaks, normalizedPath } = await window.ElectronAPI.extractWaveformPeaks(filePath);
+    const { peaks } = await window.ElectronAPI.extractWaveformPeaks(filePath);
 
     // Sanity check
     let minPeak = Infinity, maxPeak = -Infinity;
@@ -413,7 +414,7 @@ async function handleFile(fileOrPath) {
       time: i / sampleRate,
     }));
 
-    // Step 3: Init WaveSurfer using normalizedPath
+    // Step 3: Init WaveSurfer
     const arrayBuffer = await window.ElectronAPI.getNormalizedWavBuffer();
     const blob = new Blob([arrayBuffer], { type: "audio/wav" });
     const url = URL.createObjectURL(blob);
@@ -446,6 +447,7 @@ async function handleFile(fileOrPath) {
   const url = URL.createObjectURL(file);
   videoElement.src = url;
   videoElement.style.display = "block";
+  videoElementContainer.style.display = "flex";
 
 
   // ✅ Fix: Store the file for later use
@@ -474,7 +476,6 @@ async function handleFile(fileOrPath) {
       normalizeAudioBuffer(audioBuffer);
 
       precomputedPeaks = computePeaks(audioBuffer);
-
 
       const wave = initializeWaveSurfer();
       setupZoomAndScrollHandlers(wave);
@@ -507,7 +508,7 @@ function resetUIState() {
   silentRegions = [];
   lastBlob = null;
   audioPreview.src = "";
-//  videoPreview.src = "";
+  //  videoPreview.src = "";
 
   dropZone.style.display = "none";
   waveformDiv.style.display = "block";
@@ -631,7 +632,7 @@ function startLiveNonSilentPlayback(wave) {
 }
 
 function playPause() {
-    if (document.getElementById("waveform").style.display == "none") {
+  if (document.getElementById("waveform").style.display == "none") {
     console.log("no waveform");
     if (textState) {
       console.log("was playing")
@@ -681,7 +682,31 @@ function playVideoFrom(seconds) {
 
 //////////////////////////////
 // END OF PLAY NON-SILENT CODE
+// START OF VIDEO SCALING
 //////////////////////////////
+
+const video = document.getElementById('videoPreview2');
+
+let bigVideo = false
+const maximize = document.getElementById("maximize");
+maximize.addEventListener("click", () => {
+  updateVideoSize(bigVideo);
+  bigVideo = !bigVideo
+  updateMaximizeButtonUI(bigVideo)
+});
+
+function updateMaximizeButtonUI(bigVideo) {
+  maximize.innerText = bigVideo ? "Minimize preview" : "Maximize preview";
+}
+
+async function updateVideoSize(bigVideo) {
+  if (!video.videoWidth || !video.videoHeight) return;
+  videoElementContainer.style.maxWidth = bigVideo ? '15vw' : '100vw';
+  video.style.width = '100%';
+  video.style.height = 'auto';
+}
+
+
 
 
 
@@ -835,7 +860,7 @@ function markSilentRegions() {
     if (max <= threshold) {
       if (!silent) {
         if (currentRegion && time - currentRegion.end < minRegionDuration) {
-          currentRegion.end = time;
+          currentRegion.end = time
           //console.log("🔄 Extending short silent gap");
         } else {
           currentRegion = { start: time };
