@@ -1,0 +1,35 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]  # Or whatever branch you deploy from
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Free port 80 (if running self-hosted)
+        if: runner.os == 'Linux'
+        run: |
+          echo "Killing any host process using port 80..."
+          PORT80_PID=$(ss -tulnp 2>/dev/null | grep ':80 ' | awk '{print $NF}' | sed 's/.*pid=\\?//;s/,.*//')
+          [ -n "$PORT80_PID" ] && sudo kill -9 $PORT80_PID || echo "Nothing to kill."
+
+          echo "Stopping Docker containers using port 80..."
+          docker ps --format '{{.ID}} {{.Ports}}' | grep ':80->' | awk '{print $1}' | xargs -r docker stop
+
+      - name: Clean containers and networks
+        run: |
+          docker rm -f silence-remover certbot || true
+          docker container prune -f || true
+          docker network prune -f || true
+
+      - name: Build containers
+        run: docker compose -f docker-compose.prod.yml build
+
+      - name: Deploy
+        run: docker compose -f docker-compose.prod.yml up -d --force-recreate web
