@@ -260,10 +260,7 @@ textarea {
   background-color: #d35400;
 }
 
-#copyBtnPS,
-#copyBtnBASH {
-  display: none;
-}
+
 
 #waveform wave:first-child {
   color: #ffffff;
@@ -317,4 +314,25 @@ input[type="range"] {
   background-size: 100% 100%;
   background-repeat: no-repeat;
   transition: background 0.2s ease;
+}
+#audioPreview {
+  display: none;
+}
+.bug-report {
+  text-align: center;
+  font-size: 13px;
+  margin-top: 70px;
+  color: var(--text-color);
+  background: transparent;
+  opacity: 0.6;
+}
+
+.bug-report a {
+  color: var(--text-color);
+  text-decoration: underline;
+  transition: opacity 0.2s;
+}
+
+.bug-report a:hover {
+  opacity: 0.8;
 }

@@ -19,14 +19,6 @@ async function runDelayedMain() {
 
 runDelayedMain();
 
-let wavesurfer = null;
-let audioBuffer = null;
-let silentRegions = [];
-let lastBlob = null;
-let outputFormat = "mp3";
-let precomputedPeaks = [];
-let ffmpeg;
-let fetchFile;
 
 
 export async function main() {
@@ -54,47 +46,50 @@ const downloadBtn = document.getElementById("AudioDownloadBtn");
 const cutVideoBtn = document.getElementById("cutVideoBtn");
 const downloadVideoBtn = document.getElementById("downloadVideoBtn");
 const statsPanel = document.getElementById("statsPanel");
-// const vidTitle = document.getElementById("vidTitle");
 const zoomSlider = document.getElementById("zoomSlider");
 const zoomInput = document.getElementById("zoomInput");
 const thresholdSlider = document.getElementById("thresholdSlider");
 const thresholdLine = document.getElementById("thresholdLine");
 const waveform = document.getElementById("waveform");
 const videoElement = document.getElementById("videoPreview2");
-//const Fullscreen = document.getElementById("Fullscreen");
 const videoElementContainer = document.getElementById("videoPreview2container");
+const PlayNonSilent = document.getElementById("Play-Non-Silent");
+const video = document.getElementById('videoPreview2');
+const maximize = document.getElementById("maximize");
 
-
-thresholdSlider.addEventListener("input", updateThresholdLine);
 let wave = null;
-
-function updateThresholdLine() {
-  const raw = parseFloat(thresholdSlider.value) / 100;
-  const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
-  const threshold = mapped * mapped;
-
-  const waveformHeight = waveform.offsetHeight;
-  const centerY = waveformHeight / 2;
-  const yPos = centerY * (1 - threshold); // line from center (0) to top (1)
-
-  thresholdLine.style.top = `${yPos}px`;
-}
+let wavesurfer = null;
+let audioBuffer = null;
+let silentRegions = [];
+let lastBlob = null;
+let outputFormat = "mp3";
+let precomputedPeaks = [];
+let ffmpeg;
+let fetchFile;
+let followScroll = true;
+let textState = true
+let bigVideo = false
+let scrollTargetPx = null;
+let scrollLoopActive = false;
+let playState = {
+  isPlaying: false,
+  stopRequested: false,
+  intervalId: null,
+};
 
 function setupUIEvents() {
-  // vidTitle.style.display = "none";
-  audioPreview.style.display = "none";
+
+  thresholdSlider.addEventListener("input", updateThresholdLine);
 
   browseBtn.addEventListener("click", triggerFileLoad);
 
   fileInput.addEventListener("change", (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     // Prevent accidental double-trigger
     fileInput.value = ""; // clear input so change fires again for same file
     handleFile(file);
   });
-
 
   dropZone.addEventListener("dragover", (e) => {
     e.preventDefault();
@@ -127,6 +122,16 @@ function setupUIEvents() {
     handleShrinkChange();
   });
 
+  document.addEventListener('keydown', function (event) {
+    // Check if the spacebar was pressed
+    if (event.code === 'Space') {
+      event.preventDefault(); // Prevent scrolling
+      playPause(); // Your function to toggle play/pause
+    }
+  });
+
+  document.getElementById("invert").addEventListener("click", invertSilentRegions);
+
   formatButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
       formatButtons.forEach((b) => {
@@ -151,7 +156,107 @@ function setupUIEvents() {
   });
 
   cutVideoBtn.addEventListener("click", cutVideo);
+
+  fileInput.addEventListener("change", (e) => {
+    if (window.ElectronAPI) {
+      // Prevent accidental Electron fallback
+      console.warn("⚠️ Ignoring file input — Electron should use openVideoFile()");
+      return;
+    }
+
+
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    fileInput.value = ""; // clear input so change fires again for same file
+    handleFile(file);
+  }
+  );
+  videoElementContainer.addEventListener("click", () => {
+    playPause();
+  });
+
+  PlayNonSilent.addEventListener("click", () => {
+    playPause();
+  });
+
+  maximize.addEventListener("click", () => {
+    updateVideoSize(bigVideo);
+    bigVideo = !bigVideo
+    updateMaximizeButtonUI(bigVideo)
+  });
 }
+
+function resetUIState() {
+  console.warn("inside resetUIState()");
+  updatePlayButtonUI("start")
+  if (wavesurfer) {
+    wavesurfer.destroy();
+    wavesurfer = null;
+  }
+
+  audioBuffer = null;
+  silentRegions = [];
+  lastBlob = null;
+  audioPreview.src = "";
+  //  videoPreview.src = "";
+
+  dropZone.style.display = "none";
+  waveformDiv.style.display = "block";
+  updateThresholdLine();
+}
+
+///////////////////////
+// SLIDERS RELATED
+///////////////////////
+
+function updateThresholdLine() {
+  const raw = parseFloat(thresholdSlider.value) / 100;
+  const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
+  const threshold = mapped * mapped;
+
+  const waveformHeight = waveform.offsetHeight;
+  const centerY = waveformHeight / 2;
+  const yPos = centerY * (1 - threshold); // line from center (0) to top (1)
+
+  thresholdLine.style.top = `${yPos}px`;
+}
+
+function handleThresholdChange() {
+  //console.warn("inside handleThresholdChange()");
+  if (!audioBuffer && !precomputedPeaks) return;
+  markSilentRegions();
+}
+
+function handleShrinkChange() {
+  //console.warn("inside handleshrinkchange()");
+  if (!audioBuffer && !precomputedPeaks) return;
+  markSilentRegions();
+}
+
+function applyShrinkFilter(shrinkMs, minRegionDuration) {
+
+  const shrinkSec = shrinkMs / 1000;
+
+  for (let region of silentRegions) {
+    const duration = region.end - region.start;
+    const reduction = Math.min(duration, shrinkSec);
+    const newDuration = duration - reduction;
+
+    // Keep it centered
+    const center = (region.start + region.end) / 2;
+    region.start = center - newDuration / 2;
+    region.end = center + newDuration / 2;
+  }
+
+  // Remove any that became too short
+  if (silentRegions.some((r) => r.end - r.start < minRegionDuration)) {
+    silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
+  }
+}
+///////////////////////
+// PEAKS STUFF
+///////////////////////
 
 function normalizeAudioBuffer(buffer) {
   const numChannels = buffer.numberOfChannels;
@@ -195,16 +300,350 @@ function normalizeAudioBuffer(buffer) {
   }
 }
 
+function computePeaks(monoArray, sampleRate) {
+  const chunkDuration = 0.005; // 5ms
+  const samplesPerChunk = Math.floor(sampleRate * chunkDuration);
+  const length = monoArray.length;
+  const peaks = [];
+
+  for (let i = 0; i < length; i += samplesPerChunk) {
+    let max = 0;
+    const end = Math.min(i + samplesPerChunk, length);
+
+    for (let j = i; j < end; j++) {
+      const abs = Math.abs(monoArray[j]);
+      if (abs > max) max = abs;
+    }
+
+    const time = i / sampleRate;
+    peaks.push({ time, peak: max });
+  }
+
+  return peaks;
+}
+
+function enforceMinRegionDuration(regions, minDuration) {
+  //console.warn("inside enforceMinRegionDuration()");
+  if (!regions.length) return [];
+
+  const merged = [{ ...regions[0] }];
+
+  for (let i = 1; i < regions.length; i++) {
+    const prev = merged[merged.length - 1];
+    const current = regions[i];
+
+    const gap = current.start - prev.end;
+
+    if (gap < minDuration) {
+      // Merge current into previous
+      prev.end = current.end;
+    } else {
+      const duration = current.end - current.start;
+      if (duration >= minDuration) {
+        merged.push({ ...current });
+      }
+      // else skip this region entirely
+    }
+  }
+
+  return merged;
+}
+
+function calculateNonSilentRanges() {
+  console.warn("inside calculateNonSilentRanges");
+
+  const originalDuration =
+    (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
+
+  let regions = [];
+  let lastEnd = 0;
+
+  title.innerText = "Getting ready...";
+
+  silentRegions.forEach((region) => {
+    if (region.start > lastEnd) {
+      regions.push({ start: lastEnd, end: region.start });
+    }
+    lastEnd = region.end;
+  });
+
+  if (lastEnd < originalDuration) {
+    regions.push({ start: lastEnd, end: originalDuration });
+  }
+
+  return regions;
+}
+
+///////////////////////
+// RED REGIONS
+///////////////////////
+
+function invertSilentRegions() {
+  console.warn("inside invertSilentRegions");
+
+  if (!silentRegions || silentRegions.length === 0) {
+    alert("No silent regions to invert.");
+    return;
+  }
+
+  const nonSilentRegions = [];
+  let prevEnd = 0;
+
+  const totalDuration =
+    (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
+
+  for (let i = 0; i < silentRegions.length; i++) {
+    const region = silentRegions[i];
+    if (region.start > prevEnd) {
+      nonSilentRegions.push({ start: prevEnd, end: region.start });
+    }
+    prevEnd = region.end;
+  }
+
+  if (prevEnd < totalDuration) {
+    nonSilentRegions.push({ start: prevEnd, end: totalDuration });
+  }
+
+  silentRegions = nonSilentRegions;
+
+  drawRegions();
+  updateStats();
+}
+
+function autoAdjustThresholdSlider() {
+  console.warn("inside function autoAdjustThresholdSlider() ");
+
+  const step = 0.5;
+
+  const savedShrink = +shrinkSlider.value;
+  shrinkSlider.value = 0; // avoid distortion during detection
+
+  let foundMin = null;
+  let foundMax = null;
+  let prevFound = null;
+  const originalThreshold = thresholdSlider.value;
+
+  const scan = (from, to, direction) => {
+    for (
+      let val = from;
+      direction > 0 ? val <= to : val >= to;
+      val += direction * step
+    ) {
+      thresholdSlider.value = val;
+      handleThresholdChange(); // triggers markSilentRegions
+
+      const originalDuration =
+        (audioBuffer && audioBuffer.duration) || wavesurfer?.getDuration() || 0;
+
+
+      let totalSilence = 0;
+      for (const region of silentRegions) {
+        totalSilence += region.end - region.start;
+      }
+
+      const timeSaved = totalSilence;
+      const percentSaved = originalDuration
+        ? (timeSaved / originalDuration) * 100
+        : 0;
+
+      if (direction > 0 && percentSaved > 0) {
+        foundMin = prevFound;
+        break;
+      }
+
+      if (direction < 0 && percentSaved < 100) {
+        foundMax = prevFound;
+        break;
+      }
+      prevFound = val;
+    }
+  };
+
+  // Step 1: scan from 0 up
+  scan(0, 100, 1);
+
+  // Step 2: scan from 100 down
+  scan(100, 0, -1);
+
+  // Update slider bounds
+  if (foundMin !== null) thresholdSlider.min = foundMin.toFixed(2);
+  if (foundMax !== null) thresholdSlider.max = foundMax.toFixed(2);
+
+  // Restore slider state
+  thresholdSlider.value = originalThreshold;
+  shrinkSlider.value = savedShrink;
+
+  handleThresholdChange(); // reapply current threshold
+  console.log(
+    `Threshold range adjusted: ${thresholdSlider.min} - ${thresholdSlider.max}%`
+  );
+}
+
+function markSilentRegions() {
+
+  const raw = +thresholdSlider.value / 100;
+  const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
+  const threshold = mapped * mapped;
+  const shrinkMs = +shrinkSlider.value;
+  const minRegionDuration = 0.1;
+
+  silentRegions = [];
+  let silent = false;
+  let currentRegion = null;
+
+  for (let i = 0; i < precomputedPeaks.length; i++) {
+    const { peak: max, time } = precomputedPeaks[i];
+
+    if (max <= threshold) {
+      if (!silent) {
+        if (currentRegion && time - currentRegion.end < minRegionDuration) {
+          currentRegion.end = time
+        } else {
+          currentRegion = { start: time };
+        }
+        silent = true;
+      }
+    } else {
+      if (silent) {
+        currentRegion.end = time;
+        const duration = currentRegion.end - currentRegion.start;
+
+        if (duration > minRegionDuration) {
+          silentRegions.push({ ...currentRegion });
+        } else {
+          silent = true
+        }
+
+        silent = false;
+        currentRegion = null;
+      }
+    }
+  }
+
+  if (silent && currentRegion) {
+    const fallbackDuration =
+      (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
+    currentRegion.end = fallbackDuration;
+
+    const duration = currentRegion.end - currentRegion.start;
+    //console.log("🔚 Final silent region to end of audio:", fallbackDuration.toFixed(3));
+    //console.log(`⏱️ Region duration: ${duration.toFixed(3)}s`);
+
+    if (duration > minRegionDuration) {
+      silentRegions.push({ ...currentRegion });
+      //console.log("✅ Final region pushed:", currentRegion);
+    } else {
+      //console.log("⏭️ Final region skipped (too short)");
+    }
+  }
+
+  //console.log(`📦 Total silent regions detected: ${silentRegions.length}`);
+
+  applyShrinkFilter(shrinkMs, minRegionDuration);
+  silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
+
+  thresholdLine.style.display = "block";
+  title.innerText =
+    "Silent parts in red will be removed - Tweak the sliders carefully :)";
+
+  drawRegions();
+  updateStats();
+
+}
+
+function drawRegions() {
+  //console.warn("inside drawRegions...");
+
+  if (!wavesurfer) {
+    console.warn("⚠️ wavesurfer not initialized");
+    return;
+  }
+
+  // Clear existing regions
+  Object.values(wavesurfer.regions.list).forEach((region) => region.remove());
+
+  //console.log(`🧠 silentRegions (${silentRegions.length}):`, silentRegions);
+
+  let drawn = 0;
+
+  silentRegions.forEach((region) => {
+    if (region.start < region.end) {
+      drawn += 1;
+      wavesurfer.addRegion({
+        start: region.start,
+        end: region.end,
+        color: "rgba(255,0,0,0.3)",
+        drag: false,
+        resize: false,
+      });
+    }
+  });
+
+  //console.log(`✅ drawn ${drawn} region(s)`);
+}
+
+function updateSegmentUI(region, index, total) {
+  console.warn("inside updateSegmentUI()");
+
+  scrollToTimeSmooth(region.start);
+  title.innerText = `Encoding part ${index + 1} of ${total}...`;
+
+  wavesurfer.addRegion({
+    start: region.start,
+    end: region.end,
+    color: "rgba(0, 255, 0, 0.7)",
+    drag: false,
+    resize: false,
+  });
+}
+
+///////////////////////
+// WAVE & WAVESURFER
+///////////////////////
+
+
+function scrollToTimeSmooth(timeInSec) {
+  const container = document.querySelector("#waveform wave");
+  if (!wavesurfer || !container) return;
+
+  const pxPerSec = wavesurfer.params.minPxPerSec || container.scrollWidth / wavesurfer.getDuration();
+  const targetPx = timeInSec * pxPerSec;
+
+  const offset = container.clientWidth / 2;
+  scrollTargetPx = Math.max(0, Math.min(targetPx - offset, container.scrollWidth - container.clientWidth));
+
+  if (!scrollLoopActive) {
+    scrollLoopActive = true;
+    requestAnimationFrame(smoothScrollLoop);
+  }
+}
+
+function smoothScrollLoop() {
+  const container = document.querySelector("#waveform wave");
+  if (!container || scrollTargetPx === null) return;
+
+  const currentScroll = container.scrollLeft;
+  const delta = scrollTargetPx - currentScroll;
+
+  // Scroll easing factor (adjust for speed)
+  const easeFactor = 0.2;
+
+  // Apply movement
+  container.scrollLeft += delta * easeFactor;
+
+  // If we're close to the target, snap and stop
+  if (Math.abs(delta) < 1) {
+    container.scrollLeft = scrollTargetPx;
+    scrollLoopActive = false;
+    return;
+  }
+
+  requestAnimationFrame(smoothScrollLoop);
+}
 
 function setupZoomAndScrollHandlers(wave) {
-  const WHEEL_SENSITIVITY = 1 / 8;
-  const WHEEL_ACCELERATION = 0.15;
-  const WHEEL_DECELERATION = 0.9;
-  const WHEEL_IDLE_TIMEOUT = 100;
-
   const DRAG_DECELERATION = 0.95;
   const DRAG_STOP_THRESHOLD = 0.001;
-  const WHEEL_STOP_THRESHOLD = 0.001;
 
   let latestZoomValue = 50;
   let zoomTimeout = null;
@@ -325,6 +764,30 @@ function setupZoomAndScrollHandlers(wave) {
   // }
 }
 
+function initializeWaveSurfer(backend = "WebAudio") {
+  console.log("🛠️ Creating WaveSurfer with backend:", backend);
+  wavesurfer = WaveSurfer.create({
+    cursorWidth: 1.5,
+    container: waveformDiv,
+    height: 128,
+    scrollParent: false,
+    waveColor: "blue",
+    progressColor: "blue",
+    backend,
+    autoCenter: false,
+    plugins: [WaveSurfer.regions.create({})],
+  });
+  wavesurfer.on("finish", () => {
+    console.log("✅ Playback finished");
+    playState.isPlaying = false;
+    updatePlayButtonUI("play");
+  });
+  return document.querySelector("#waveform wave");
+}
+
+///////////////////////
+// HANDLING FILE
+///////////////////////
 
 async function triggerFileLoad() {
   if (window.ElectronAPI) {
@@ -338,23 +801,6 @@ async function triggerFileLoad() {
     fileInput.click(); // browser will trigger onchange → handleFile(file)
   }
 }
-
-
-fileInput.addEventListener("change", (e) => {
-  if (window.ElectronAPI) {
-    // Prevent accidental Electron fallback
-    console.warn("⚠️ Ignoring file input — Electron should use openVideoFile()");
-    return;
-  }
-
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  fileInput.value = ""; // clear input so change fires again for same file
-  handleFile(file);
-});
-
-
 
 function showLargeFileWarning() {
   if (document.getElementById("large-file-warning")) return; // prevent duplicates
@@ -384,10 +830,6 @@ function showLargeFileWarning() {
     title.parentNode.insertBefore(warning, title.nextSibling);
   }
 }
-
-
-
-
 
 async function handleFile(fileOrPath) {
   console.warn("inside handleFile");
@@ -522,63 +964,10 @@ async function handleFile(fileOrPath) {
   reader.readAsArrayBuffer(file);
 }
 
-
-function resetUIState() {
-  console.warn("inside resetUIState()");
-  updatePlayButtonUI("start")
-  if (wavesurfer) {
-    wavesurfer.destroy();
-    wavesurfer = null;
-  }
-
-  audioBuffer = null;
-  silentRegions = [];
-  lastBlob = null;
-  audioPreview.src = "";
-  //  videoPreview.src = "";
-
-  dropZone.style.display = "none";
-  waveformDiv.style.display = "block";
-  updateThresholdLine();
-}
-
-
-function initializeWaveSurfer(backend = "WebAudio") {
-  console.log("🛠️ Creating WaveSurfer with backend:", backend);
-  wavesurfer = WaveSurfer.create({
-    cursorWidth: 1.5,
-    container: waveformDiv,
-    height: 128,
-    scrollParent: false,
-    waveColor: "blue",
-    progressColor: "blue",
-    backend,
-    autoCenter: false,
-    plugins: [WaveSurfer.regions.create({})],
-  });
-  wavesurfer.on("finish", () => {
-    console.log("✅ Playback finished");
-    playState.isPlaying = false;
-    updatePlayButtonUI("play");
-  });
-  return document.querySelector("#waveform wave");
-}
-
-
-
-
 ////////////////////////////
-// PLAY NON-SILENT CODE AREA
+// PREVIEW AUDIO & VIDEO
 ////////////////////////////
 
-
-let playState = {
-  isPlaying: false,
-  stopRequested: false,
-  intervalId: null,
-};
-
-const PlayNonSilent = document.getElementById("Play-Non-Silent");
 
 function updatePlayButtonUI(mode) {
   PlayNonSilent.innerText = mode === "stop" ? "⏹ Stop" : "▶️ Play";
@@ -597,8 +986,6 @@ function findNextNonSilentTime(time) {
   }
   return null;
 }
-
-let followScroll = true;
 
 function startScrollFollowLoop() {
   if (!followScroll) return;
@@ -685,17 +1072,6 @@ function playPause() {
   }
 }
 
-let textState = true
-
-
-videoElementContainer.addEventListener("click", () => {
-  playPause();
-});
-
-PlayNonSilent.addEventListener("click", () => {
-  playPause();
-});
-
 function playVideoFrom(seconds) {
   videoElement.currentTime = seconds;
   videoElement.removeAttribute("controls");
@@ -704,24 +1080,6 @@ function playVideoFrom(seconds) {
   videoElement.muted = true;
   videoElement.removeAttribute("controls");
 }
-
-
-// Fullscreen.addEventListener("click", () => {toggleFullscreen()});
-
-//////////////////////////////
-// END OF PLAY NON-SILENT CODE
-// START OF VIDEO SCALING
-//////////////////////////////
-
-const video = document.getElementById('videoPreview2');
-
-let bigVideo = false
-const maximize = document.getElementById("maximize");
-maximize.addEventListener("click", () => {
-  updateVideoSize(bigVideo);
-  bigVideo = !bigVideo
-  updateMaximizeButtonUI(bigVideo)
-});
 
 function updateMaximizeButtonUI(bigVideo) {
   maximize.innerText = bigVideo ? "Minimize preview" : "Maximize preview";
@@ -734,251 +1092,8 @@ async function updateVideoSize(bigVideo) {
   video.style.height = 'auto';
 }
 
-function computePeaks(monoArray, sampleRate) {
-  const chunkDuration = 0.005; // 5ms
-  const samplesPerChunk = Math.floor(sampleRate * chunkDuration);
-  const length = monoArray.length;
-  const peaks = [];
-
-  for (let i = 0; i < length; i += samplesPerChunk) {
-    let max = 0;
-    const end = Math.min(i + samplesPerChunk, length);
-
-    for (let j = i; j < end; j++) {
-      const abs = Math.abs(monoArray[j]);
-      if (abs > max) max = abs;
-    }
-
-    const time = i / sampleRate;
-    peaks.push({ time, peak: max });
-  }
-
-  return peaks;
-}
 
 
-
-
-let scrollTargetPx = null;
-let scrollLoopActive = false;
-
-function scrollToTimeSmooth(timeInSec) {
-  const container = document.querySelector("#waveform wave");
-  if (!wavesurfer || !container) return;
-
-  const pxPerSec = wavesurfer.params.minPxPerSec || container.scrollWidth / wavesurfer.getDuration();
-  const targetPx = timeInSec * pxPerSec;
-
-  const offset = container.clientWidth / 2;
-  scrollTargetPx = Math.max(0, Math.min(targetPx - offset, container.scrollWidth - container.clientWidth));
-
-  if (!scrollLoopActive) {
-    scrollLoopActive = true;
-    requestAnimationFrame(smoothScrollLoop);
-  }
-}
-
-function smoothScrollLoop() {
-  const container = document.querySelector("#waveform wave");
-  if (!container || scrollTargetPx === null) return;
-
-  const currentScroll = container.scrollLeft;
-  const delta = scrollTargetPx - currentScroll;
-
-  // Scroll easing factor (adjust for speed)
-  const easeFactor = 0.2;
-
-  // Apply movement
-  container.scrollLeft += delta * easeFactor;
-
-  // If we're close to the target, snap and stop
-  if (Math.abs(delta) < 1) {
-    container.scrollLeft = scrollTargetPx;
-    scrollLoopActive = false;
-    return;
-  }
-
-  requestAnimationFrame(smoothScrollLoop);
-}
-
-
-function handleThresholdChange() {
-  //console.warn("inside handleThresholdChange()");
-  if (!audioBuffer && !precomputedPeaks) return;
-  markSilentRegions();
-}
-function handleShrinkChange() {
-  //console.warn("inside handleshrinkchange()");
-  if (!audioBuffer && !precomputedPeaks) return;
-  markSilentRegions();
-}
-
-
-function applyShrinkFilter(shrinkMs, minRegionDuration) {
-
-  const shrinkSec = shrinkMs / 1000;
-
-  for (let region of silentRegions) {
-    const duration = region.end - region.start;
-    const reduction = Math.min(duration, shrinkSec);
-    const newDuration = duration - reduction;
-
-    // Keep it centered
-    const center = (region.start + region.end) / 2;
-    region.start = center - newDuration / 2;
-    region.end = center + newDuration / 2;
-  }
-
-  // Remove any that became too short
-  if (silentRegions.some((r) => r.end - r.start < minRegionDuration)) {
-    silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
-  }
-}
-
-function enforceMinRegionDuration(regions, minDuration) {
-  //console.warn("inside enforceMinRegionDuration()");
-  if (!regions.length) return [];
-
-  const merged = [{ ...regions[0] }];
-
-  for (let i = 1; i < regions.length; i++) {
-    const prev = merged[merged.length - 1];
-    const current = regions[i];
-
-    const gap = current.start - prev.end;
-
-    if (gap < minDuration) {
-      // Merge current into previous
-      prev.end = current.end;
-    } else {
-      const duration = current.end - current.start;
-      if (duration >= minDuration) {
-        merged.push({ ...current });
-      }
-      // else skip this region entirely
-    }
-  }
-
-  return merged;
-}
-
-function markSilentRegions() {
-
-  //  console.log("📍 inside markSilentRegions()");
-
-  const raw = +thresholdSlider.value / 100;
-  const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
-  const threshold = mapped * mapped;
-  const shrinkMs = +shrinkSlider.value;
-  const minRegionDuration = 0.1;
-
-  //console.log("📊 thresholdSlider.value (raw %):", raw * 100);
-  //console.log("📈 threshold (mapped + squared):", threshold.toFixed(6));
-  //console.log("🔧 shrinkMs:", shrinkMs);
-  //console.log("🕒 minRegionDuration:", minRegionDuration);
-
-  silentRegions = [];
-  let silent = false;
-  let currentRegion = null;
-
-  //console.log(`📉 precomputedPeaks.length = ${precomputedPeaks.length}`);
-
-  for (let i = 0; i < precomputedPeaks.length; i++) {
-    const { peak: max, time } = precomputedPeaks[i];
-
-    if (max <= threshold) {
-      if (!silent) {
-        if (currentRegion && time - currentRegion.end < minRegionDuration) {
-          currentRegion.end = time
-          //console.log("🔄 Extending short silent gap");
-        } else {
-          currentRegion = { start: time };
-          //console.log("🟥 Starting new silent region at", time.toFixed(3));
-        }
-        silent = true;
-      }
-    } else {
-      if (silent) {
-        currentRegion.end = time;
-        const duration = currentRegion.end - currentRegion.start;
-        //console.log("⬛ Ending silent region at", time.toFixed(3));
-        //console.log(`⏱️ Region duration: ${duration.toFixed(3)}s`);
-
-        if (duration > minRegionDuration) {
-          silentRegions.push({ ...currentRegion });
-          //console.log("✅ Region pushed:", currentRegion);
-        } else {
-          silent = true
-        }
-
-        silent = false;
-        currentRegion = null;
-      }
-    }
-  }
-
-  if (silent && currentRegion) {
-    const fallbackDuration =
-      (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
-    currentRegion.end = fallbackDuration;
-
-    const duration = currentRegion.end - currentRegion.start;
-    //console.log("🔚 Final silent region to end of audio:", fallbackDuration.toFixed(3));
-    //console.log(`⏱️ Region duration: ${duration.toFixed(3)}s`);
-
-    if (duration > minRegionDuration) {
-      silentRegions.push({ ...currentRegion });
-      //console.log("✅ Final region pushed:", currentRegion);
-    } else {
-      //console.log("⏭️ Final region skipped (too short)");
-    }
-  }
-
-  //console.log(`📦 Total silent regions detected: ${silentRegions.length}`);
-
-  applyShrinkFilter(shrinkMs, minRegionDuration);
-  silentRegions = enforceMinRegionDuration(silentRegions, minRegionDuration);
-
-  thresholdLine.style.display = "block";
-  title.innerText =
-    "Silent parts in red will be removed - Tweak the sliders carefully :)";
-
-  drawRegions();
-  updateStats();
-
-}
-
-
-function drawRegions() {
-  //console.warn("inside drawRegions...");
-
-  if (!wavesurfer) {
-    console.warn("⚠️ wavesurfer not initialized");
-    return;
-  }
-
-  // Clear existing regions
-  Object.values(wavesurfer.regions.list).forEach((region) => region.remove());
-
-  //console.log(`🧠 silentRegions (${silentRegions.length}):`, silentRegions);
-
-  let drawn = 0;
-
-  silentRegions.forEach((region) => {
-    if (region.start < region.end) {
-      drawn += 1;
-      wavesurfer.addRegion({
-        start: region.start,
-        end: region.end,
-        color: "rgba(255,0,0,0.3)",
-        drag: false,
-        resize: false,
-      });
-    }
-  });
-
-  //console.log(`✅ drawn ${drawn} region(s)`);
-}
 
 
 function updateStats() {
@@ -1004,6 +1119,11 @@ function updateStats() {
 
   statsPanel.innerText = `Time saved: ${timeDisplay} – ${percentSaved}% shorter – ${silentRegions.length} silence regions`;
 }
+
+
+////////////////////////////
+// PROCESSING AUDIO
+////////////////////////////
 
 
 async function cutAudio() {
@@ -1095,7 +1215,6 @@ async function cutAudio() {
   }
 }
 
-// Modified encoder functions
 function encodeMP3Async(buffer) {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -1199,156 +1318,10 @@ function encodeMP3(buffer) {
   return new Blob(data, { type: "audio/mp3" });
 }
 
-function calculateNonSilentRanges() {
-  console.warn("inside calculateNonSilentRanges");
 
-  const originalDuration =
-    (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
-
-  let regions = [];
-  let lastEnd = 0;
-
-  title.innerText = "Getting ready...";
-
-  silentRegions.forEach((region) => {
-    if (region.start > lastEnd) {
-      regions.push({ start: lastEnd, end: region.start });
-    }
-    lastEnd = region.end;
-  });
-
-  if (lastEnd < originalDuration) {
-    regions.push({ start: lastEnd, end: originalDuration });
-  }
-
-  return regions;
-}
-
-
-function updateSegmentUI(region, index, total) {
-  console.warn("inside updateSegmentUI()");
-
-  scrollToTimeSmooth(region.start);
-  title.innerText = `Encoding part ${index + 1} of ${total}...`;
-
-  wavesurfer.addRegion({
-    start: region.start,
-    end: region.end,
-    color: "rgba(0, 255, 0, 0.7)",
-    drag: false,
-    resize: false,
-  });
-}
-
-function addFFmpegCommandScripts(
-  start,
-  duration,
-  outputName,
-  psScriptLines,
-  bashScriptLines,
-  fileListLines
-) {
-
-  console.warn("inside addFFmpegCommandScripts");
-
-  const ffmpegCommand = `ffmpeg -ss ${start} -i input.mp4 -to ${duration} -c:v libx264 -crf 20 -preset ultrafast -profile:v high -pix_fmt yuv420p -movflags +faststart -c:a aac -b:a 128k -threads 0 -avoid_negative_ts 1 ${outputName}`;
-
-  psScriptLines.push(ffmpegCommand);
-  bashScriptLines.push(ffmpegCommand);
-  fileListLines.push(`file '${outputName}'`);
-}
-
-function outputConcatScriptsToUI(
-
-
-  psScriptLines,
-  bashScriptLines,
-  fileListLines
-) {
-  console.warn("inside outputConcatScriptsToUI");
-  psScriptLines.push(
-    '\n@"\n' +
-    fileListLines.join("\n") +
-    '\n"@ | Out-File -Encoding ASCII list.txt'
-  );
-  psScriptLines.push(
-    "ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4\n"
-  );
-
-  bashScriptLines.push(
-    "cat << EOF > list.txt\n" + fileListLines.join("\n") + "\nEOF"
-  );
-  bashScriptLines.push(
-    "ffmpeg -f concat -safe 0 -i list.txt -c copy final_output.mp4"
-  );
-
-  document.getElementById("psScript").value = psScriptLines.join("\n");
-  document.getElementById("bashScript").value = bashScriptLines.join("\n");
-}
-
-async function mergeProcessedBatchesWithFFmpegWASM() {
-  console.warn("inside mergeProcessedBatchesWithFFmpegWASM");
-
-  const { createFFmpeg } = window.FFmpegLib;
-  const ffmpegMerge = createFFmpeg({ log: true });
-
-  await ffmpegMerge.load({
-    classWorkerURL: new URL("/worker/worker.mjs", window.location.origin).href,
-    workerOptions: { type: "module" },
-  });
-
-  const listLines = [];
-
-  for (let i = 0; i < window.processedBatches.length; i++) {
-    const filename = `final_batch_${i}.mp4`;
-    await ffmpegMerge.writeFile(filename, window.processedBatches[i]);
-    listLines.push(`file '${filename}'`);
-  }
-
-  await ffmpegMerge.writeFile("list.txt", listLines.join("\n"));
-
-  const args = [
-    "-f",
-    "concat",
-    "-safe",
-    "0",
-    "-i",
-    "list.txt",
-    "-c",
-    "copy",
-    "final_merged.mp4",
-  ];
-
-  await ffmpegMerge.exec(args);
-
-  const finalData = await ffmpegMerge.readFile("final_merged.mp4");
-  return new Blob([finalData.buffer], { type: "video/mp4" });
-}
-
-function displayMergedVideo(blob) {
-  console.warn("inside displayMergedVideo");
-
-  const url = URL.createObjectURL(blob);
-  //const videoPreview = document.querySelector("#videoPreview");
-
-  // videoPreview.src = url;
-  // videoPreview.style.display = "inline-block";
-  downloadVideoBtn.style.display = "inline-block";
-  copyBtnBASH.style.display = "inline-block";
-  copyBtnPS.style.display = "inline-block";
-
-  title.innerText = "Done! Consider donating ❤️";
-
-  downloadVideoBtn.onclick = () => {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "final_merged.mp4";
-    a.click();
-  };
-
-  scrollToBottomWithDelay();
-  console.log("Final video merged and loaded.");
-}
+////////////////////////////
+// PROCESSING VIDEO
+////////////////////////////
 
 async function cutVideo() {
   console.warn("inside cutVideo");
@@ -1370,10 +1343,7 @@ async function cutVideo() {
 
   const isElectron = typeof window.ElectronAPI?.cutOneSegment === "function";
   const totalParts = nonSilentRegions.length;
-
-  const psScriptLines = [];
-  const bashScriptLines = [];
-  const fileListLines = [];
+  
   const allSegmentFileNames = [];
 
   if (isElectron) {
@@ -1389,19 +1359,9 @@ async function cutVideo() {
     for (let i = 0; i < totalParts; i++) {
       const region = nonSilentRegions[i];
       const outputName = `part${i}.mp4`;
-      const start = region.start.toFixed(6);
-      const duration = (region.end - region.start).toFixed(6);
 
       allSegmentFileNames.push(outputName);
       updateSegmentUI(region, i, totalParts);
-      addFFmpegCommandScripts(
-        start,
-        duration,
-        outputName,
-        psScriptLines,
-        bashScriptLines,
-        fileListLines
-      );
 
       await window.ElectronAPI.cutOneSegment(
         { path: inputPath }, // ✅ Only pass file path
@@ -1462,14 +1422,7 @@ async function cutVideo() {
         segmentFileNames.push(outputName);
 
         updateSegmentUI(region, index, totalParts);
-        addFFmpegCommandScripts(
-          start,
-          duration,
-          outputName,
-          psScriptLines,
-          bashScriptLines,
-          fileListLines
-        );
+
 
         const args = [
           "-ss",
@@ -1525,9 +1478,70 @@ async function cutVideo() {
     console.log("✅ WASM processing complete.");
   }
 
-  outputConcatScriptsToUI(psScriptLines, bashScriptLines, fileListLines);
   title.innerText =
     "✅ Done! You can now concatenate the parts or download scripts.";
+}
+
+async function mergeProcessedBatchesWithFFmpegWASM() {
+  console.warn("inside mergeProcessedBatchesWithFFmpegWASM");
+
+  const { createFFmpeg } = window.FFmpegLib;
+  const ffmpegMerge = createFFmpeg({ log: true });
+
+  await ffmpegMerge.load({
+    classWorkerURL: new URL("/worker/worker.mjs", window.location.origin).href,
+    workerOptions: { type: "module" },
+  });
+
+  const listLines = [];
+
+  for (let i = 0; i < window.processedBatches.length; i++) {
+    const filename = `final_batch_${i}.mp4`;
+    await ffmpegMerge.writeFile(filename, window.processedBatches[i]);
+    listLines.push(`file '${filename}'`);
+  }
+
+  await ffmpegMerge.writeFile("list.txt", listLines.join("\n"));
+
+  const args = [
+    "-f",
+    "concat",
+    "-safe",
+    "0",
+    "-i",
+    "list.txt",
+    "-c",
+    "copy",
+    "final_merged.mp4",
+  ];
+
+  await ffmpegMerge.exec(args);
+
+  const finalData = await ffmpegMerge.readFile("final_merged.mp4");
+  return new Blob([finalData.buffer], { type: "video/mp4" });
+}
+
+function displayMergedVideo(blob) {
+  console.warn("inside displayMergedVideo");
+
+  const url = URL.createObjectURL(blob);
+  //const videoPreview = document.querySelector("#videoPreview");
+
+  // videoPreview.src = url;
+  // videoPreview.style.display = "inline-block";
+  downloadVideoBtn.style.display = "inline-block";
+
+  title.innerText = "Done! Consider donating ❤️";
+
+  downloadVideoBtn.onclick = () => {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "final_merged.mp4";
+    a.click();
+  };
+
+  scrollToBottomWithDelay();
+  console.log("Final video merged and loaded.");
 }
 
 function displayMergedVideoFromPath(filePath) {
@@ -1538,8 +1552,6 @@ function displayMergedVideoFromPath(filePath) {
   // videoPreview.src = filePath;
   // videoPreview.style.display = "inline-block";
   downloadVideoBtn.style.display = "inline-block";
-  copyBtnBASH.style.display = "inline-block";
-  copyBtnPS.style.display = "inline-block";
 
   title.innerText = "Done! Consider donating ❤️";
 
@@ -1553,7 +1565,6 @@ function displayMergedVideoFromPath(filePath) {
   scrollToBottomWithDelay();
   console.log("✅ Final video loaded from disk:", filePath);
 }
-
 
 async function concatSegments(fileNames, outputFileName = "final.mp4") {
   console.warn("inside concatSegments");
@@ -1608,143 +1619,3 @@ function scroll(duration) {
   requestAnimationFrame(step);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const copyBtnBASH = document.getElementById("copyBtnBASH");
-  const copyBtnPS = document.getElementById("copyBtnPS");
-  const psScript = document.getElementById("psScript");
-  const bashScript = document.getElementById("bashScript");
-
-  copyBtnPS.addEventListener("click", async () => {
-    try {
-      copyBtnPS.style.backgroundColor = "#2ecc71";
-      copyBtnPS.innerText = "Copied PowerShell!";
-      await navigator.clipboard.writeText(psScript.value);
-      //alert('PowerShell script copied to clipboard!');
-    } catch (err) {
-      console.error("Failed to copy:", err);
-      alert(
-        "Failed to copy script. Your browser may not support clipboard access."
-      );
-    }
-  });
-
-  copyBtnBASH.addEventListener("click", async () => {
-    try {
-      copyBtnBASH.style.backgroundColor = "#2ecc71";
-      copyBtnBASH.innerText = "Copied Bash!";
-      await navigator.clipboard.writeText(bashScript.value);
-      //alert('bash script copied to clipboard!');
-    } catch (err) {
-      console.error("Failed to copy:", err);
-      alert(
-        "Failed to copy script. Your browser may not support clipboard access."
-      );
-    }
-  });
-});
-
-document
-  .getElementById("invert")
-  .addEventListener("click", invertSilentRegions);
-
-
-function invertSilentRegions() {
-  console.warn("inside invertSilentRegions");
-
-  if (!silentRegions || silentRegions.length === 0) {
-    alert("No silent regions to invert.");
-    return;
-  }
-
-  const nonSilentRegions = [];
-  let prevEnd = 0;
-
-  const totalDuration =
-    (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
-
-  for (let i = 0; i < silentRegions.length; i++) {
-    const region = silentRegions[i];
-    if (region.start > prevEnd) {
-      nonSilentRegions.push({ start: prevEnd, end: region.start });
-    }
-    prevEnd = region.end;
-  }
-
-  if (prevEnd < totalDuration) {
-    nonSilentRegions.push({ start: prevEnd, end: totalDuration });
-  }
-
-  silentRegions = nonSilentRegions;
-
-  drawRegions();
-  updateStats();
-}
-
-function autoAdjustThresholdSlider() {
-  console.warn("inside function autoAdjustThresholdSlider() ");
-
-  const step = 0.5;
-
-  const savedShrink = +shrinkSlider.value;
-  shrinkSlider.value = 0; // avoid distortion during detection
-
-  let foundMin = null;
-  let foundMax = null;
-  let prevFound = null;
-  const originalThreshold = thresholdSlider.value;
-
-  const scan = (from, to, direction) => {
-    for (
-      let val = from;
-      direction > 0 ? val <= to : val >= to;
-      val += direction * step
-    ) {
-      thresholdSlider.value = val;
-      handleThresholdChange(); // triggers markSilentRegions
-
-      const originalDuration =
-        (audioBuffer && audioBuffer.duration) || wavesurfer?.getDuration() || 0;
-
-
-      let totalSilence = 0;
-      for (const region of silentRegions) {
-        totalSilence += region.end - region.start;
-      }
-
-      const timeSaved = totalSilence;
-      const percentSaved = originalDuration
-        ? (timeSaved / originalDuration) * 100
-        : 0;
-
-      if (direction > 0 && percentSaved > 0) {
-        foundMin = prevFound;
-        break;
-      }
-
-      if (direction < 0 && percentSaved < 100) {
-        foundMax = prevFound;
-        break;
-      }
-      prevFound = val;
-    }
-  };
-
-  // Step 1: scan from 0 up
-  scan(0, 100, 1);
-
-  // Step 2: scan from 100 down
-  scan(100, 0, -1);
-
-  // Update slider bounds
-  if (foundMin !== null) thresholdSlider.min = foundMin.toFixed(2);
-  if (foundMax !== null) thresholdSlider.max = foundMax.toFixed(2);
-
-  // Restore slider state
-  thresholdSlider.value = originalThreshold;
-  shrinkSlider.value = savedShrink;
-
-  handleThresholdChange(); // reapply current threshold
-  console.log(
-    `Threshold range adjusted: ${thresholdSlider.min} - ${thresholdSlider.max}%`
-  );
-}
