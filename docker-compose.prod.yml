@@ -9,7 +9,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - /home/ubuntu/silence-remover/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - /var/lib/docker/volumes/certbot-etc/_data:/etc/letsencrypt:ro
       - certbot-var:/var/lib/letsencrypt
 
