@@ -3,6 +3,7 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ master ]  # Or whatever branch you deploy from
+  workflow_dispatch:
 
 jobs:
   deploy:
