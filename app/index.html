@@ -147,17 +147,6 @@
       applyTheme(isDark ? 'light' : 'dark');
     });
   </script>
-  <script>
-  const sliders = document.querySelectorAll('input[type="range"]');
-  sliders.forEach(slider => {
-    const updateBackground = () => {
-      const percentage = 100 * (slider.value - slider.min) / (slider.max - slider.min);
-      slider.style.setProperty('--value', `${percentage}%`);
-    };
-    slider.addEventListener('input', updateBackground);
-    updateBackground(); // initialize on load
-  });
-</script>
 </body>
 
 </html>

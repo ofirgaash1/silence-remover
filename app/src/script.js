@@ -29,6 +29,7 @@ export async function main() {
   fetchFile = ffetch;
 
   setupUIEvents();
+  updateBackground()
 }
 
 const title = document.getElementById("title");
@@ -56,6 +57,7 @@ const videoElementContainer = document.getElementById("videoPreview2container");
 const PlayNonSilent = document.getElementById("Play-Non-Silent");
 const video = document.getElementById('videoPreview2');
 const maximize = document.getElementById("maximize");
+const sliders = document.querySelectorAll('input[type="range"]');
 
 let wave = null;
 let wavesurfer = null;
@@ -77,7 +79,19 @@ let playState = {
   intervalId: null,
 };
 
+
+function updateBackground() {
+  sliders.forEach(slider => {
+    const percentage = 100 * (slider.value - slider.min) / (slider.max - slider.min);
+    slider.style.setProperty('--value', `${percentage}%`);
+  })
+};
+
 function setupUIEvents() {
+
+  sliders.forEach(slider => {
+    slider.addEventListener('input', updateBackground);
+  });
 
   thresholdSlider.addEventListener("input", updateThresholdLine);
 
@@ -184,6 +198,10 @@ function setupUIEvents() {
     updateVideoSize(bigVideo);
     bigVideo = !bigVideo
     updateMaximizeButtonUI(bigVideo)
+  });
+
+  zoomSlider.addEventListener("input", (e) => {
+    zoomInput.value = ((e.target.value * 100) / 8).toFixed(2);
   });
 }
 
@@ -457,6 +475,9 @@ function autoAdjustThresholdSlider() {
       }
       prevFound = val;
     }
+
+    zoomSlider.value = prevFound
+
   };
 
   // Step 1: scan from 0 up
@@ -477,6 +498,10 @@ function autoAdjustThresholdSlider() {
   console.log(
     `Threshold range adjusted: ${thresholdSlider.min} - ${thresholdSlider.max}%`
   );
+  zoomSlider.value = 0
+  updateBackground()
+
+
 }
 
 function markSilentRegions() {
@@ -649,13 +674,13 @@ function setupZoomAndScrollHandlers(wave) {
   let zoomTimeout = null;
 
   zoomSlider.addEventListener("input", (e) => {
-    zoomInput.value = ((e.target.value * 100) / 8).toFixed(2);
     clearTimeout(zoomTimeout);
     latestZoomValue = e.target.valueAsNumber;
 
     zoomTimeout = setTimeout(() => {
       applyZoom(latestZoomValue, wave);
     }, 1);
+
   });
 
   function applyZoom(zoomValue, waveEl) {
@@ -1343,7 +1368,7 @@ async function cutVideo() {
 
   const isElectron = typeof window.ElectronAPI?.cutOneSegment === "function";
   const totalParts = nonSilentRegions.length;
-  
+
   const allSegmentFileNames = [];
 
   if (isElectron) {
