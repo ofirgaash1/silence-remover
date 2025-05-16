@@ -2,7 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]  # Or whatever branch you deploy from
+    branches: [ master ]  # Or whatever branch you deploy from
 
 jobs:
   deploy:
