@@ -11,8 +11,10 @@ RUN npm run build
 # Stage 2: Serve with NGINX
 FROM nginx:alpine
 
-# ✅ Ensure the directory exists so volume can mount here
-RUN mkdir -p /etc/nginx/conf.d
+# ✅ Ensure the directory exists and remove default config to allow volume mount
+RUN mkdir -p /etc/nginx/conf.d \
+    && rm -f /etc/nginx/conf.d/default.conf \
+    && touch /etc/nginx/conf.d/default.conf
 
 # ✅ Clean the default HTML directory
 RUN rm -rf /usr/share/nginx/html/*
