@@ -491,7 +491,7 @@ function autoAdjustThresholdSlider() {
   if (foundMax !== null) thresholdSlider.max = foundMax.toFixed(2);
 
   // Restore slider state
-  thresholdSlider.value = originalThreshold;
+  thresholdSlider.value = 27;
   shrinkSlider.value = savedShrink;
 
   handleThresholdChange(); // reapply current threshold
