@@ -6,7 +6,7 @@
   --primary-text: #fff;
   --drop-zone-bg: #fff;
   --drop-zone-border: #7f8c8d;
-  --threshold-line: rgba(0, 0, 0, 0.274);
+  --threshold-line: rgba(0, 0, 0, 0.5);
   --input-bg: #fff;
   --input-border: #ccc;
   --slider-track: #ddd;
@@ -21,7 +21,7 @@ body.dark-mode {
   --primary-text: #fff;
   --drop-zone-bg: #1c1c1c;
   --drop-zone-border: #555;
-  --threshold-line: rgba(255, 255, 255, 0.3);
+  --threshold-line: rgba(0, 0, 0, 0.5);
   --input-bg: #2a2a2a;
   --input-border: #555;
   --slider-track: #555;
