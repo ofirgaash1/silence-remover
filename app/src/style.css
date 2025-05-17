@@ -37,6 +37,10 @@ body {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
+::-webkit-scrollbar {
+  width: 0px; /* or 0 if you want no scrollbar thumb */
+}
+
 #waveformContainer {
   margin: 0px 10px;
 }
