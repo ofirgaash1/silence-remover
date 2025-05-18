@@ -433,13 +433,11 @@ function autoAdjustThresholdSlider() {
 
   const step = 0.5;
 
-  const savedShrink = +shrinkSlider.value;
   shrinkSlider.value = 0; // avoid distortion during detection
 
   let foundMin = null;
   let foundMax = null;
   let prevFound = null;
-  const originalThreshold = thresholdSlider.value;
 
   const scan = (from, to, direction) => {
     for (
@@ -490,7 +488,7 @@ function autoAdjustThresholdSlider() {
 
   // Restore slider state
   thresholdSlider.value = 27;
-  shrinkSlider.value = savedShrink;
+  shrinkSlider.value = 40;
 
   handleThresholdChange(); // reapply current threshold
   console.log(
@@ -697,7 +695,7 @@ function setupZoomAndScrollHandlers(wave) {
     waveEl.scrollLeft = newCenterPx - containerWidth / 2;
 
     title.innerText =
-      "Click and drag the waveform, or use the scroll wheel over it";
+      "Click and drag the waveform";
   }
 
   let isDown = false;
