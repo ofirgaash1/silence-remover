@@ -188,15 +188,17 @@ function setupUIEvents() {
   videoElementContainer.addEventListener("click", () => {
     playPause();
   });
+  videoElementContainer.classList.add("small");
 
   PlayNonSilent.addEventListener("click", () => {
     playPause();
   });
 
   maximize.addEventListener("click", () => {
-    updateVideoSize(bigVideo);
     bigVideo = !bigVideo;
-    updateMaximizeButtonUI(bigVideo);
+    videoElementContainer.classList.toggle("small", !bigVideo);
+    videoElementContainer.classList.toggle("big", bigVideo);
+    btn.innerText = bigVideo ? "Minimize preview" : "Maximize preview";
   });
 
   zoomSlider.addEventListener("input", (e) => {
@@ -1107,17 +1109,6 @@ function playVideoFrom(seconds) {
   videoElement.removeAttribute("controls");
   videoElement.muted = true;
   videoElement.removeAttribute("controls");
-}
-
-function updateMaximizeButtonUI(bigVideo) {
-  maximize.innerText = bigVideo ? "Minimize preview" : "Maximize preview";
-}
-
-async function updateVideoSize(bigVideo) {
-  if (!video.videoWidth || !video.videoHeight) return;
-  videoElementContainer.style.maxWidth = bigVideo ? "15vw" : "100vw";
-  video.style.width = "100%";
-  video.style.height = "auto";
 }
 
 function updateStats() {

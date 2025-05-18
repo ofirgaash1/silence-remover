@@ -29,13 +29,12 @@ body.dark-mode {
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   margin: 0px 0px;
   background: var(--bg-color);
   color: var(--text-color);
   text-align: center;
   transition: background 0.3s ease, color 0.3s ease;
-  
 }
 
 ::-webkit-scrollbar {
@@ -222,27 +221,35 @@ textarea {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
+/* always center the video inside its box */
 #videoPreview2container {
-  display: none;
+  display: flex;
   justify-content: center;
   align-items: center;
-  width: 100%;
-  max-width: 17vw;
-  overflow: hidden;
-  max-height: calc(100vh - 100px);
-  margin: 0 auto;
   background: black;
-  transition: max-width 0.8s ease;
-  position: relative;
+  overflow: hidden; /* just in case */
+  transition: width 0.8s ease, height 0.8s ease;
+  margin: 0 auto;
+  background: transparent;
 }
 
+/* small state = 15% of viewport */
+#videoPreview2container.small {
+  width: 15vw;
+  height: 15vh;
+}
+
+/* big state = fill the viewport */
+#videoPreview2container.big {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* video always fills its container but keeps its intrinsic aspect ratio */
 #videoPreview2 {
-  display: block;
-  max-width: 100%;
   width: 100%;
-  height: auto;
+  height: 100%;
   object-fit: contain;
-  transition: width 0.8s ease, height 0.8s ease;
 }
 
 .donate-form {
@@ -263,8 +270,6 @@ textarea {
 .download-btn:hover {
   background-color: #d35400;
 }
-
-
 
 #waveform wave:first-child {
   color: #ffffff;
@@ -299,8 +304,6 @@ textarea {
   border: 1px solid var(--input-border);
   transition: background 0.3s ease, color 0.3s ease;
 }
-
-
 
 input[type="range"] {
   appearance: none;
