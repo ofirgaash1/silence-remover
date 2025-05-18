@@ -19,8 +19,6 @@ async function runDelayedMain() {
 
 runDelayedMain();
 
-
-
 export async function main() {
   console.warn("inside main");
 
@@ -29,7 +27,7 @@ export async function main() {
   fetchFile = ffetch;
 
   setupUIEvents();
-  updateBackground()
+  updateBackground();
 }
 
 const title = document.getElementById("title");
@@ -55,7 +53,7 @@ const waveform = document.getElementById("waveform");
 const videoElement = document.getElementById("videoPreview2");
 const videoElementContainer = document.getElementById("videoPreview2container");
 const PlayNonSilent = document.getElementById("Play-Non-Silent");
-const video = document.getElementById('videoPreview2');
+const video = document.getElementById("videoPreview2");
 const maximize = document.getElementById("maximize");
 const sliders = document.querySelectorAll('input[type="range"]');
 
@@ -69,8 +67,8 @@ let precomputedPeaks = [];
 let ffmpeg;
 let fetchFile;
 let followScroll = true;
-let textState = true
-let bigVideo = false
+let textState = true;
+let bigVideo = false;
 let scrollTargetPx = null;
 let scrollLoopActive = false;
 let playState = {
@@ -79,18 +77,17 @@ let playState = {
   intervalId: null,
 };
 
-
 function updateBackground() {
-  sliders.forEach(slider => {
-    const percentage = 100 * (slider.value - slider.min) / (slider.max - slider.min);
-    slider.style.setProperty('--value', `${percentage}%`);
-  })
-};
+  sliders.forEach((slider) => {
+    const percentage =
+      (100 * (slider.value - slider.min)) / (slider.max - slider.min);
+    slider.style.setProperty("--value", `${percentage}%`);
+  });
+}
 
 function setupUIEvents() {
-
-  sliders.forEach(slider => {
-    slider.addEventListener('input', updateBackground);
+  sliders.forEach((slider) => {
+    slider.addEventListener("input", updateBackground);
   });
 
   thresholdSlider.addEventListener("input", updateThresholdLine);
@@ -136,15 +133,17 @@ function setupUIEvents() {
     handleShrinkChange();
   });
 
-  document.addEventListener('keydown', function (event) {
+  document.addEventListener("keydown", function (event) {
     // Check if the spacebar was pressed
-    if (event.code === 'Space') {
+    if (event.code === "Space") {
       event.preventDefault(); // Prevent scrolling
       playPause(); // Your function to toggle play/pause
     }
   });
 
-  document.getElementById("invert").addEventListener("click", invertSilentRegions);
+  document
+    .getElementById("invert")
+    .addEventListener("click", invertSilentRegions);
 
   formatButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -174,18 +173,18 @@ function setupUIEvents() {
   fileInput.addEventListener("change", (e) => {
     if (window.ElectronAPI) {
       // Prevent accidental Electron fallback
-      console.warn("⚠️ Ignoring file input — Electron should use openVideoFile()");
+      console.warn(
+        "⚠️ Ignoring file input — Electron should use openVideoFile()"
+      );
       return;
     }
-
 
     const file = e.target.files?.[0];
     if (!file) return;
 
     fileInput.value = ""; // clear input so change fires again for same file
     handleFile(file);
-  }
-  );
+  });
   videoElementContainer.addEventListener("click", () => {
     playPause();
   });
@@ -196,8 +195,8 @@ function setupUIEvents() {
 
   maximize.addEventListener("click", () => {
     updateVideoSize(bigVideo);
-    bigVideo = !bigVideo
-    updateMaximizeButtonUI(bigVideo)
+    bigVideo = !bigVideo;
+    updateMaximizeButtonUI(bigVideo);
   });
 
   zoomSlider.addEventListener("input", (e) => {
@@ -207,7 +206,7 @@ function setupUIEvents() {
 
 function resetUIState() {
   console.warn("inside resetUIState()");
-  updatePlayButtonUI("start")
+  updatePlayButtonUI("start");
   if (wavesurfer) {
     wavesurfer.destroy();
     wavesurfer = null;
@@ -253,7 +252,6 @@ function handleShrinkChange() {
 }
 
 function applyShrinkFilter(shrinkMs, minRegionDuration) {
-
   const shrinkSec = shrinkMs / 1000;
 
   for (let region of silentRegions) {
@@ -453,7 +451,6 @@ function autoAdjustThresholdSlider() {
       const originalDuration =
         (audioBuffer && audioBuffer.duration) || wavesurfer?.getDuration() || 0;
 
-
       let totalSilence = 0;
       for (const region of silentRegions) {
         totalSilence += region.end - region.start;
@@ -476,8 +473,7 @@ function autoAdjustThresholdSlider() {
       prevFound = val;
     }
 
-    zoomSlider.value = prevFound
-
+    zoomSlider.value = prevFound;
   };
 
   // Step 1: scan from 0 up
@@ -498,14 +494,11 @@ function autoAdjustThresholdSlider() {
   console.log(
     `Threshold range adjusted: ${thresholdSlider.min} - ${thresholdSlider.max}%`
   );
-  zoomSlider.value = 0
-  updateBackground()
-
-
+  zoomSlider.value = 0;
+  updateBackground();
 }
 
 function markSilentRegions() {
-
   const raw = +thresholdSlider.value / 100;
   const mapped = 0.5 * (Math.sin(Math.PI * (raw - 0.5)) + 1);
   const threshold = mapped * mapped;
@@ -522,7 +515,7 @@ function markSilentRegions() {
     if (max <= threshold) {
       if (!silent) {
         if (currentRegion && time - currentRegion.end < minRegionDuration) {
-          currentRegion.end = time
+          currentRegion.end = time;
         } else {
           currentRegion = { start: time };
         }
@@ -536,7 +529,7 @@ function markSilentRegions() {
         if (duration > minRegionDuration) {
           silentRegions.push({ ...currentRegion });
         } else {
-          silent = true
+          silent = true;
         }
 
         silent = false;
@@ -573,7 +566,6 @@ function markSilentRegions() {
 
   drawRegions();
   updateStats();
-
 }
 
 function drawRegions() {
@@ -626,16 +618,20 @@ function updateSegmentUI(region, index, total) {
 // WAVE & WAVESURFER
 ///////////////////////
 
-
 function scrollToTimeSmooth(timeInSec) {
   const container = document.querySelector("#waveform wave");
   if (!wavesurfer || !container) return;
 
-  const pxPerSec = wavesurfer.params.minPxPerSec || container.scrollWidth / wavesurfer.getDuration();
+  const pxPerSec =
+    wavesurfer.params.minPxPerSec ||
+    container.scrollWidth / wavesurfer.getDuration();
   const targetPx = timeInSec * pxPerSec;
 
   const offset = container.clientWidth / 2;
-  scrollTargetPx = Math.max(0, Math.min(targetPx - offset, container.scrollWidth - container.clientWidth));
+  scrollTargetPx = Math.max(
+    0,
+    Math.min(targetPx - offset, container.scrollWidth - container.clientWidth)
+  );
 
   if (!scrollLoopActive) {
     scrollLoopActive = true;
@@ -680,14 +676,14 @@ function setupZoomAndScrollHandlers(wave) {
     zoomTimeout = setTimeout(() => {
       applyZoom(latestZoomValue, wave);
     }, 1);
-
   });
 
   function applyZoom(zoomValue, waveEl) {
     const duration = audioBuffer?.duration || wavesurfer.getDuration() || 1;
     const containerWidth = waveEl.clientWidth;
 
-    const currentPxPerSec = wavesurfer.params.minPxPerSec || waveEl.scrollWidth / duration;
+    const currentPxPerSec =
+      wavesurfer.params.minPxPerSec || waveEl.scrollWidth / duration;
     const scrollLeft = waveEl.scrollLeft;
     const centerPx = scrollLeft + containerWidth / 2;
     const centerTime = centerPx / currentPxPerSec;
@@ -698,7 +694,8 @@ function setupZoomAndScrollHandlers(wave) {
     const newCenterPx = centerTime * newPxPerSec;
     waveEl.scrollLeft = newCenterPx - containerWidth / 2;
 
-    title.innerText = "Click and drag the waveform, or use the scroll wheel over it";
+    title.innerText =
+      "Click and drag the waveform, or use the scroll wheel over it";
   }
 
   let isDown = false;
@@ -707,7 +704,6 @@ function setupZoomAndScrollHandlers(wave) {
   let dragVelocity = 0;
   let lastX = 0;
   let dragMomentumId = null;
-
 
   wave.addEventListener("mousedown", (e) => {
     isDown = true;
@@ -821,7 +817,9 @@ async function triggerFileLoad() {
       await handleFile({ path: filePath }); // ← guaranteed to have .path
     }
   } else {
-    console.log(`window.ElectronAPI = ${window.ElectronAPI} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`);
+    console.log(
+      `window.ElectronAPI = ${window.ElectronAPI} !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!`
+    );
 
     fileInput.click(); // browser will trigger onchange → handleFile(file)
   }
@@ -865,7 +863,7 @@ async function handleFile(fileOrPath) {
 
   if (!isElectron && fileOrPath.size && fileOrPath.size >= 700 * 1024 * 1024) {
     showLargeFileWarning();
-    return
+    return;
   }
 
   resetUIState();
@@ -880,17 +878,22 @@ async function handleFile(fileOrPath) {
     const sampleRate = 220.5;
 
     // ✅ Updated: Only return peaks and WAV path
-    title.innerHTML = "Computing peaks..."
+    title.innerHTML = "Computing peaks...";
     const { peaks } = await window.ElectronAPI.extractWaveformPeaks(filePath);
 
     // Sanity check
-    let minPeak = Infinity, maxPeak = -Infinity;
+    let minPeak = Infinity,
+      maxPeak = -Infinity;
     for (const val of peaks) {
       if (val < minPeak) minPeak = val;
       if (val > maxPeak) maxPeak = val;
     }
 
-    console.log(`🧪 Peak sanity check — min: ${minPeak.toFixed(3)}, max: ${maxPeak.toFixed(3)}`);
+    console.log(
+      `🧪 Peak sanity check — min: ${minPeak.toFixed(
+        3
+      )}, max: ${maxPeak.toFixed(3)}`
+    );
     if (minPeak < -1.01 || maxPeak > 1.01) {
       console.warn("⚠️ Peaks are outside expected [-1, 1] range.");
     } else if (minPeak === maxPeak) {
@@ -927,12 +930,9 @@ async function handleFile(fileOrPath) {
 
     window.uploadedFile = { path: filePath };
     console.log("✅ Normalized audio loaded and visualized");
-    handleThresholdChange()
+    handleThresholdChange();
     return;
   }
-
-
-
 
   console.log("is browser!!!!!!!!!!");
 
@@ -942,7 +942,6 @@ async function handleFile(fileOrPath) {
   videoElement.src = url;
   videoElement.style.display = "block";
   videoElementContainer.style.display = "flex";
-
 
   // ✅ Fix: Store the file for later use
   window.uploadedFile = file;
@@ -968,8 +967,10 @@ async function handleFile(fileOrPath) {
 
       title.innerText = "Normalizing...";
       normalizeAudioBuffer(audioBuffer); // in-place
-      precomputedPeaks = computePeaks(audioBuffer.getChannelData(0), audioBuffer.sampleRate);
-
+      precomputedPeaks = computePeaks(
+        audioBuffer.getChannelData(0),
+        audioBuffer.sampleRate
+      );
 
       const wave = initializeWaveSurfer();
       setupZoomAndScrollHandlers(wave);
@@ -993,13 +994,12 @@ async function handleFile(fileOrPath) {
 // PREVIEW AUDIO & VIDEO
 ////////////////////////////
 
-
 function updatePlayButtonUI(mode) {
   PlayNonSilent.innerText = mode === "stop" ? "⏹ Stop" : "▶️ Play";
 }
 
 function isTimeInSilentRegion(time) {
-  return silentRegions.some(r => time >= r.start && time < r.end);
+  return silentRegions.some((r) => time >= r.start && time < r.end);
 }
 
 function findNextNonSilentTime(time) {
@@ -1034,15 +1034,17 @@ function startScrollFollowLoop() {
 }
 
 function startLiveNonSilentPlayback(wave) {
+  const currentTime = wavesurfer.getCurrentTime();
   playState.stopRequested = false;
   playState.isPlaying = true;
   updatePlayButtonUI("stop");
   wavesurfer.play();
+  playVideoFrom(currentTime);
 
   // Start interval for silence skipping
   playState.intervalId = setInterval(() => {
     if (playState.stopRequested) {
-      videoElement.pause()
+      videoElement.pause();
       console.log("🛑 Stop requested — stopping");
       clearInterval(playState.intervalId);
       followScroll = false;
@@ -1057,15 +1059,17 @@ function startLiveNonSilentPlayback(wave) {
     if (isTimeInSilentRegion(currentTime)) {
       const skipTo = findNextNonSilentTime(currentTime);
       if (skipTo !== null) {
-        playVideoFrom(skipTo)
-        console.log(`⏭️ Skipping silence at ${currentTime.toFixed(2)} → ${skipTo.toFixed(2)}`);
+        playVideoFrom(skipTo);
+        console.log(
+          `⏭️ Skipping silence at ${currentTime.toFixed(2)} → ${skipTo.toFixed(
+            2
+          )}`
+        );
         wavesurfer.play(skipTo);
         return;
       }
-
     }
   }, 50);
-  ;
   // Start smooth scroll follow
   followScroll = true;
   startScrollFollowLoop();
@@ -1075,16 +1079,15 @@ function playPause() {
   if (document.getElementById("waveform").style.display == "none") {
     console.log("no waveform");
     if (textState) {
-      console.log("was playing")
-      updatePlayButtonUI("stop")
-      textState = false
+      console.log("was playing");
+      updatePlayButtonUI("stop");
+      textState = false;
+    } else {
+      console.log("was stopped");
+      updatePlayButtonUI("start");
+      textState = true;
     }
-    else {
-      console.log("was stopped")
-      updatePlayButtonUI("start")
-      textState = true
-    }
-    return
+    return;
   }
   console.log("yes waveform");
 
@@ -1112,14 +1115,10 @@ function updateMaximizeButtonUI(bigVideo) {
 
 async function updateVideoSize(bigVideo) {
   if (!video.videoWidth || !video.videoHeight) return;
-  videoElementContainer.style.maxWidth = bigVideo ? '15vw' : '100vw';
-  video.style.width = '100%';
-  video.style.height = 'auto';
+  videoElementContainer.style.maxWidth = bigVideo ? "15vw" : "100vw";
+  video.style.width = "100%";
+  video.style.height = "auto";
 }
-
-
-
-
 
 function updateStats() {
   //console.warn("inside updateStats()");
@@ -1145,17 +1144,17 @@ function updateStats() {
   statsPanel.innerText = `Time saved: ${timeDisplay} – ${percentSaved}% shorter – ${silentRegions.length} silence regions`;
 }
 
-
 ////////////////////////////
 // PROCESSING AUDIO
 ////////////////////////////
-
 
 async function cutAudio() {
   console.warn("inside cutAudio");
 
   if (!audioBuffer) {
-    alert("currently, this is a browser only featue. if you are using browser, your file doesnt have sound.")
+    alert(
+      "currently, this is a browser only featue. if you are using browser, your file doesnt have sound."
+    );
     return;
   }
 
@@ -1343,7 +1342,6 @@ function encodeMP3(buffer) {
   return new Blob(data, { type: "audio/mp3" });
 }
 
-
 ////////////////////////////
 // PROCESSING VIDEO
 ////////////////////////////
@@ -1392,12 +1390,15 @@ async function cutVideo() {
         { path: inputPath }, // ✅ Only pass file path
         { start: region.start, end: region.end, outputName }
       );
-
-
     }
 
-    const finalPath = await window.ElectronAPI.runMergeAndClean(allSegmentFileNames);
-    console.log("✅ Native Electron processing complete. Final path:", finalPath);
+    const finalPath = await window.ElectronAPI.runMergeAndClean(
+      allSegmentFileNames
+    );
+    console.log(
+      "✅ Native Electron processing complete. Final path:",
+      finalPath
+    );
 
     if (finalPath) {
       displayMergedVideoFromPath(finalPath);
@@ -1447,7 +1448,6 @@ async function cutVideo() {
         segmentFileNames.push(outputName);
 
         updateSegmentUI(region, index, totalParts);
-
 
         const args = [
           "-ss",
@@ -1643,4 +1643,3 @@ function scroll(duration) {
 
   requestAnimationFrame(step);
 }
-
