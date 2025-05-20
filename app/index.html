@@ -1,101 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Audio & Video Silence Remover</title>
-    <link rel="stylesheet" href="./src/style.css" />
-  </head>
 
-  <body>
-    <div id="themeToggle" class="theme-toggle">
-      <span id="themeIcon">🌙</span>
+<head>
+  <meta charset="UTF-8" />
+  <title>Audio & Video Silence Remover</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+
+<body>
+  <div id="themeToggle" class="theme-toggle">
+    <span id="themeIcon">🌙</span>
+  </div>
+  <form action="https://www.paypal.com/donate" method="post" target="_top" class="donate-form">
+    <input type="hidden" name="hosted_button_id" value="MRJF9A83YR2BE" />
+    <input type="image" src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif" border="0" name="submit"
+      title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+  </form>
+
+  <h1 id="title">Audio & Video Silence Cutter</h1>
+
+  <!-- Drag & Drop or Browse Area -->
+  <div id="drop-zone" class="drop-zone">
+    <div id="drop-zone-text">
+      <p>
+        Drag & drop an audio or video file here<br />or
+        <button id="browseBtn">Choose File</button>
+      </p>
+      <input type="file" id="audioFile" accept="audio/*,video/*,.mov" style="display: none" />
     </div>
-    <form
-      action="https://www.paypal.com/donate"
-      method="post"
-      target="_top"
-      class="donate-form"
-    >
-      <input type="hidden" name="hosted_button_id" value="MRJF9A83YR2BE" />
-      <input
-        type="image"
-        src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif"
-        border="0"
-        name="submit"
-        title="PayPal - The safer, easier way to pay online!"
-        alt="Donate with PayPal button"
-      />
-    </form>
+  </div>
 
-    <h1 id="title">Audio & Video Silence Cutter</h1>
+  <!-- Waveform Container -->
+  <div id="waveformContainer" style="position: relative">
+    <div id="waveform" class="waveform" style="display: none"></div>
+    <div id="thresholdLine"></div>
+  </div>
 
-    <!-- Drag & Drop or Browse Area -->
-    <div id="drop-zone" class="drop-zone">
-      <div id="drop-zone-text">
-        <p>
-          Drag & drop an audio or video file here<br />or
-          <button id="browseBtn">Choose File</button>
-        </p>
-        <input
-          type="file"
-          id="audioFile"
-          accept="audio/*,video/*,.mov"
-          style="display: none"
-        />
-      </div>
-    </div>
-
-    <!-- Waveform Container -->
-    <div id="waveformContainer" style="position: relative">
-      <div id="waveform" class="waveform" style="display: none"></div>
-      <div id="thresholdLine"></div>
-    </div>
-
-    <!-- <button id="Fullscreen">⛶ Fullscreen</button> -->
-    <!-- Sliders and Controls -->
+  <!-- <button id="Fullscreen">⛶ Fullscreen</button> -->
+  <!-- Sliders and Controls -->
+  <div class="main-layout">
+    <section id="videoPreview2container">
+      <video id="videoPreview2" muted></video>
+    </section>
 
     <div class="controls">
-      <div class="control-group">
-        <label for="zoomSlider">Zoom:</label>
-        <label class="slider-row">
-          <input
-            type="range"
-            id="zoomSlider"
-            min="0"
-            max="8"
-            value="0"
-            step="0.01"
-          />
-          <input type="number" id="zoomInput" step="0.01" />%
-        </label>
-      </div>
 
       <div class="control-group">
-        <label for="thresholdSlider">Amplitude Threshold:</label>
+        <label for="zoomSlider" class="slider-label">Zoom:</label>
         <div class="slider-row">
-          <input
-            type="range"
-            id="thresholdSlider"
-            min="0"
-            max="100"
-            step="0.01"
-          />
-          <input type="number" id="thresholdInput" step="0.01" />%
+          <input type="range" id="zoomSlider" min="0" max="8" value="0" step="0.08" />
+          <div class="input-wrap">
+            <div class="input-wrap">
+              <input type="number" id="zoomInput" step="0.01" />
+              <span>%</span>
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="control-group">
-        <label for="shrinkSlider">Shrink Silence:</label>
+        <label for="thresholdSlider" class="slider-label">Amplitude Threshold:</label>
         <div class="slider-row">
-          <input
-            type="range"
-            id="shrinkSlider"
-            min="0"
-            value="0"
-            max="1000"
-            step="1"
-          />
-          <input type="number" id="shrinkInput" step="1" />ms
+          <input type="range" id="thresholdSlider" min="0" max="100" step="0.01" />
+          <div class="input-wrap">
+            <input type="number" id="thresholdInput" step="0.01" />
+            <span>%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label for="shrinkSlider" class="slider-label">Shrink Silence:</label>
+        <div class="slider-row">
+          <input type="range" id="shrinkSlider" min="0" value="0" max="1000" step="1" />
+          <div class="input-wrap">
+            <input type="number" id="shrinkInput" step="1" />
+            <span>ms</span>
+          </div>
         </div>
       </div>
 
@@ -107,72 +88,72 @@
 
       <div class="button-row">
         <button id="Play-Non-Silent">▶️ Play</button>
-        <button id="maximize">Maximize Preview</button>
         <button id="cutAudio">Export Audio</button>
         <button id="cutVideoBtn">Export Video</button>
         <button id="invert">Invert</button>
       </div>
     </div>
 
-    <!-- Statistics Panel -->
-    <div id="statsPanel">Time saved: 0s - 0% shorter - 0 silence regions</div>
+  </div>
 
-    <section id="videoPreview2container">
-      <video id="videoPreview2" muted></video>
-    </section>
+  <!-- Statistics Panel -->
+  <div id="statsPanel">Time saved: 0s - 0% shorter - 0 silence regions</div>
 
-    <audio id="audioPreview" controls></audio>
-    <br />
-    <button id="AudioDownloadBtn" class="download-btn">Download Audio</button>
 
-    <!-- Video Preview -->
-    <br />
-    <button id="downloadVideoBtn" class="download-btn">Download Video</button>
+  <audio id="audioPreview" controls></audio>
+  <br />
+  <button id="AudioDownloadBtn" class="download-btn">Download Audio</button>
 
-    <!-- Processing Indicator -->
-    <footer class="bug-report">
-      Found a bug?
-      <a href="mailto:ofir.gaash@gmail.com">ofir.gaash@gmail.com</a>
-    </footer>
+  <!-- Video Preview -->
+  <br />
+  <button id="downloadVideoBtn" class="download-btn">Download Video</button>
 
-    <!-- Script dependencies -->
-    <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
-    <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
-    <script type="module" src="./src/script.js"></script>
-    <script>
-      const body = document.body;
-      const toggleBtn = document.getElementById("themeToggle");
-      const themeIcon = document.getElementById("themeIcon");
+  <!-- Processing Indicator -->
+  <footer class="bug-report">
+    Found a bug?
+    <a href="mailto:ofir.gaash@gmail.com">ofir.gaash@gmail.com</a>
+  </footer>
 
-      function applyTheme(mode) {
-        if (mode === "dark") {
-          body.classList.add("dark-mode");
-          themeIcon.textContent = "☀️";
-        } else {
-          body.classList.remove("dark-mode");
-          themeIcon.textContent = "🌙";
-        }
-        localStorage.setItem("theme", mode);
-      }
+  <!-- Script dependencies -->
+  <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
+  <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
+  <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
 
-      // Detect preference
-      const savedTheme = localStorage.getItem("theme");
-      const prefersDark = window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      ).matches;
+  <script type="module" src="./src/script.js"></script>
+  <script>
+    const body = document.body;
+    const toggleBtn = document.getElementById("themeToggle");
+    const themeIcon = document.getElementById("themeIcon");
 
-      if (savedTheme) {
-        applyTheme(savedTheme);
+    function applyTheme(mode) {
+      if (mode === "dark") {
+        body.classList.add("dark-mode");
+        themeIcon.textContent = "☀️";
       } else {
-        applyTheme(prefersDark ? "dark" : "light");
+        body.classList.remove("dark-mode");
+        themeIcon.textContent = "🌙";
       }
+      localStorage.setItem("theme", mode);
+    }
 
-      // Toggle handler
-      toggleBtn.addEventListener("click", () => {
-        const isDark = body.classList.contains("dark-mode");
-        applyTheme(isDark ? "light" : "dark");
-      });
-    </script>
-  </body>
+    // Detect preference
+    const savedTheme = localStorage.getItem("theme");
+    const prefersDark = window.matchMedia(
+      "(prefers-color-scheme: dark)"
+    ).matches;
+
+    if (savedTheme) {
+      applyTheme(savedTheme);
+    } else {
+      applyTheme(prefersDark ? "dark" : "light");
+    }
+
+    // Toggle handler
+    toggleBtn.addEventListener("click", () => {
+      const isDark = body.classList.contains("dark-mode");
+      applyTheme(isDark ? "light" : "dark");
+    });
+  </script>
+</body>
+
 </html>

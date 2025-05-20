@@ -10,7 +10,7 @@
   --input-bg: #fff;
   --input-border: #ccc;
   --slider-track: #ddd;
-  --slider-thumb: #3498db;
+  --slider-thumb: #363edb;
 }
 
 body.dark-mode {
@@ -25,24 +25,26 @@ body.dark-mode {
   --input-bg: #2a2a2a;
   --input-border: #555;
   --slider-track: #555;
-  --slider-thumb: #3498db;
+  --slider-thumb: #75b7e4;
 }
 
 body {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  margin: 0px 0px;
+  margin: 0;
   background: var(--bg-color);
   color: var(--text-color);
   text-align: center;
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-::-webkit-scrollbar {
-  width: 0px; /* or 0 if you want no scrollbar thumb */
+wave::-webkit-scrollbar {
+  height: 0;
 }
 
-#waveformContainer {
-  margin: 0px 10px;
+
+::-webkit-scrollbar {
+  width: 0px;
+  /* or 0 if you want no scrollbar thumb */
 }
 
 h1 {
@@ -51,6 +53,7 @@ h1 {
   color: var(--text-color);
 }
 
+/* Drag & Drop */
 .drop-zone {
   display: flex;
   align-items: center;
@@ -58,12 +61,11 @@ h1 {
   height: 128px;
   border: 2px dashed var(--drop-zone-border);
   margin: 20px 10px;
-  background-color: var(--drop-zone-bg);
-  cursor: pointer;
+  background: var(--drop-zone-bg);
   border-radius: 12px;
+  cursor: pointer;
   transition: background-color 0.3s, border-color 0.3s;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  text-align: center;
 }
 
 #drop-zone-text p {
@@ -76,11 +78,11 @@ h1 {
 }
 
 .drop-zone.dragover {
-  height: 128px;
   border-color: #3498db;
   background-color: #ecf7ff;
 }
 
+/* Buttons */
 button {
   font-family: inherit;
   border: none;
@@ -97,44 +99,10 @@ button:hover {
   opacity: 0.9;
 }
 
-#thresholdLine {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background-color: var(--threshold-line);
-  pointer-events: none;
-  display: none;
-}
-
-wave {
-  cursor: grab;
-  user-select: none;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-wave::-webkit-scrollbar {
-  height: 0;
-}
-
-wave.dragging {
-  cursor: grabbing;
-}
-
-.waveform-scroller::-webkit-scrollbar {
-  height: 0;
-}
-
-textarea {
-  position: absolute;
-  left: -9999px;
-  top: auto;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
+/* Waveform */
+#waveformContainer {
+  margin: 0 10px;
+  position: relative;
 }
 
 #waveform {
@@ -146,46 +114,177 @@ textarea {
   display: none;
 }
 
+#thresholdLine {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background-color: var(--threshold-line);
+  pointer-events: none;
+  display: none;
+}
+
+/* Video Preview Container */
+#videoPreview2container {
+  width: 50%;
+  aspect-ratio: 16 / 9;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: width 0.4s ease, height 0.4s ease;
+  margin: 0 auto;
+}
+
+#videoPreview2container.big {
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1010;
+  background-color: #121212f9;
+}
+
+#videoPreview2container.small {
+  width: 50%;
+  height: auto;
+  box-sizing: border-box;
+}
+
+
+#videoPreview2 {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Controls Panel */
+.main-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  /* stretch to match video height */
+  gap: 20px;
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
 .controls {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 80%;
+  height: 100%;
+  /* match video height */
+  box-sizing: border-box;
   background: var(--card-bg);
   border-radius: 12px;
   padding: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  max-width: 800px;
-  margin: 0 auto;
-  color: var(--text-color);
-  transition: background 0.3s ease, color 0.3s ease;
 }
 
-.control-group {
-  margin: 10px auto;
+/* Each slider row */
+.controls .control-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-bottom: 1.5rem;
+  /* vertical spacing */
+}
+
+.controls .control-group:last-child {
+  margin-bottom: 0;
+}
+
+.control-group label {
+  flex: 0 0 120px;
+  text-align: left;
+  font-weight: bold;
 }
 
 .slider-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 10px;
+  gap: 22px;
+  flex: 1;
+  min-width: 0;
+  /* allow proper flex-shrink */
 }
 
+/* Track */
 .slider-row input[type="range"] {
   flex: 1;
-  max-width: 400px;
+  min-width: 0;
+  height: 6px;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 3px;
+  background: linear-gradient(to right,
+      var(--slider-thumb) 0%,
+      var(--slider-thumb) var(--value, 50%),
+      var(--slider-track) var(--value, 50%),
+      var(--slider-track) 100%);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  transition: background 0.2s ease;
 }
 
-.slider-row input[type="number"] {
-  width: 60px;
-  padding: 6px;
+
+
+/* Knob size */
+.slider-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: var(--slider-thumb);
+  cursor: pointer;
+}
+
+.slider-row input[type="range"]::-moz-range-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background-color: var(--slider-thumb);
+  cursor: pointer;
+}
+
+/* Number inputs next to sliders */
+.input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 80px;
+  justify-content: flex-end;
+  white-space: nowrap;
+}
+
+.input-wrap input[type="number"] {
+  width: 70px;
+  height: 32px;
+  /* match thumb height for vertical alignment */
+  padding: 0 6px;
   border-radius: 6px;
-  border: 1px solid #ccc;
-}
-#Play-Non-Silent {
-  background-color: #3e5126e3;
-  color: white;
-  margin: 0 5px;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  border: 1px solid var(--input-border);
+  text-align: center;
+  box-sizing: border-box;
 }
 
+.input-wrap span {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Audio format buttons */
 .format-controls {
   margin: 20px 0;
 }
@@ -201,6 +300,7 @@ textarea {
   color: white;
 }
 
+/* Player & export buttons */
 .button-row {
   margin-top: 20px;
 }
@@ -209,6 +309,17 @@ textarea {
   margin: 5px;
 }
 
+#Play-Non-Silent {
+  background-color: #3e5126e3;
+  color: white;
+  margin: 0 5px;
+}
+
+#invert {
+  background-color: #7f8c8d;
+}
+
+/* Stats panel */
 #statsPanel {
   font-size: 18px;
   font-weight: bold;
@@ -221,37 +332,7 @@ textarea {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* always center the video inside its box */
-#videoPreview2container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: black;
-  overflow: hidden; /* just in case */
-  transition: width 0.8s ease, height 0.8s ease;
-  margin: 0 auto;
-  background: transparent;
-}
-
-/* small state = 15% of viewport */
-#videoPreview2container.small {
-  width: 15vw;
-  height: 15vh;
-}
-
-/* big state = fill the viewport */
-#videoPreview2container.big {
-  width: 100vw;
-  height: 100vh;
-}
-
-/* video always fills its container but keeps its intrinsic aspect ratio */
-#videoPreview2 {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
+/* Misc */
 .donate-form {
   position: fixed;
   top: 10px;
@@ -275,10 +356,6 @@ textarea {
   color: #ffffff;
 }
 
-#invert {
-  background-color: #7f8c8d;
-}
-
 .theme-toggle {
   position: fixed;
   top: 10px;
@@ -298,33 +375,10 @@ textarea {
   transition: background 0.3s ease, color 0.3s ease;
 }
 
-.slider-row input[type="number"] {
-  background-color: var(--input-bg);
-  color: var(--text-color);
-  border: 1px solid var(--input-border);
-  transition: background 0.3s ease, color 0.3s ease;
-}
-
-input[type="range"] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: linear-gradient(
-    to right,
-    var(--slider-thumb) 0%,
-    var(--slider-thumb) var(--value, 50%),
-    var(--slider-track) var(--value, 50%),
-    var(--slider-track) 100%
-  );
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
-  transition: background 0.2s ease;
-}
 #audioPreview {
   display: none;
 }
+
 .bug-report {
   text-align: center;
   font-size: 13px;

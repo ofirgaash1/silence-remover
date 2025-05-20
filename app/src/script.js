@@ -53,8 +53,6 @@ const waveform = document.getElementById("waveform");
 const videoElement = document.getElementById("videoPreview2");
 const videoElementContainer = document.getElementById("videoPreview2container");
 const PlayNonSilent = document.getElementById("Play-Non-Silent");
-const video = document.getElementById("videoPreview2");
-const maximize = document.getElementById("maximize");
 const sliders = document.querySelectorAll('input[type="range"]');
 
 let wave = null;
@@ -194,16 +192,29 @@ function setupUIEvents() {
     playPause();
   });
 
-  maximize.addEventListener("click", () => {
-    bigVideo = !bigVideo;
-    videoElementContainer.classList.toggle("small", !bigVideo);
-    videoElementContainer.classList.toggle("big", bigVideo);
-    btn.innerText = bigVideo ? "Minimize preview" : "Maximize preview";
+  document.addEventListener("keydown", (e) => {
+    // ignore if focus is in an input, textarea, or contenteditable
+    const tag = document.activeElement.tagName;
+    if ((tag === "INPUT" || tag === "TEXTAREA" || document.activeElement.isContentEditable)) {
+      return;
+    }
+    // check for lowercase or uppercase “f”
+    if (e.key.toLowerCase() === "f") {
+      e.preventDefault();   // prevents page scroll or other defaults
+      togglePreview();
+    }
   });
 
   zoomSlider.addEventListener("input", (e) => {
     zoomInput.value = ((e.target.value * 100) / 8).toFixed(2);
   });
+}
+
+function togglePreview() {
+  bigVideo = !bigVideo;
+  videoElementContainer.classList.toggle("small", !bigVideo);
+  videoElementContainer.classList.toggle("big", bigVideo);
+  btn.innerText = bigVideo ? "Minimize preview" : "Maximize preview";
 }
 
 function resetUIState() {
@@ -319,7 +330,7 @@ function normalizeAudioBuffer(buffer) {
 }
 
 function computePeaks(monoArray, sampleRate) {
-  const chunkDuration = 0.005; // 5ms
+  const chunkDuration = 0.02; // 10ms
   const samplesPerChunk = Math.floor(sampleRate * chunkDuration);
   const length = monoArray.length;
   const peaks = [];
@@ -328,9 +339,10 @@ function computePeaks(monoArray, sampleRate) {
     let max = 0;
     const end = Math.min(i + samplesPerChunk, length);
 
-    for (let j = i; j < end; j++) {
+    for (let j = i; j < end; j += 2) {
       const abs = Math.abs(monoArray[j]);
       if (abs > max) max = abs;
+      monoArray[j] = 0
     }
 
     const time = i / sampleRate;
@@ -662,6 +674,26 @@ function smoothScrollLoop() {
   requestAnimationFrame(smoothScrollLoop);
 }
 
+function applyZoom(zoomValue, waveEl) {
+  const duration = audioBuffer?.duration || wavesurfer.getDuration() || 1;
+  const containerWidth = waveEl.clientWidth;
+
+  const currentPxPerSec =
+    wavesurfer.params.minPxPerSec || waveEl.scrollWidth / duration;
+  const scrollLeft = waveEl.scrollLeft;
+  const centerPx = scrollLeft + containerWidth / 2;
+  const centerTime = centerPx / currentPxPerSec;
+  const newPxPerSec = containerWidth / duration + zoomValue ** 2;
+
+  wavesurfer.zoom(newPxPerSec);
+
+  const newCenterPx = centerTime * newPxPerSec;
+  waveEl.scrollLeft = newCenterPx - containerWidth / 2;
+
+  title.innerText =
+    "Click and drag the waveform";
+}
+
 function setupZoomAndScrollHandlers(wave) {
   const DRAG_DECELERATION = 0.95;
   const DRAG_STOP_THRESHOLD = 0.001;
@@ -670,33 +702,12 @@ function setupZoomAndScrollHandlers(wave) {
   let zoomTimeout = null;
 
   zoomSlider.addEventListener("input", (e) => {
-    clearTimeout(zoomTimeout);
     latestZoomValue = e.target.valueAsNumber;
 
     zoomTimeout = setTimeout(() => {
       applyZoom(latestZoomValue, wave);
     }, 1);
   });
-
-  function applyZoom(zoomValue, waveEl) {
-    const duration = audioBuffer?.duration || wavesurfer.getDuration() || 1;
-    const containerWidth = waveEl.clientWidth;
-
-    const currentPxPerSec =
-      wavesurfer.params.minPxPerSec || waveEl.scrollWidth / duration;
-    const scrollLeft = waveEl.scrollLeft;
-    const centerPx = scrollLeft + containerWidth / 2;
-    const centerTime = centerPx / currentPxPerSec;
-    const newPxPerSec = containerWidth / duration + zoomValue ** 2;
-
-    wavesurfer.zoom(newPxPerSec);
-
-    const newCenterPx = centerTime * newPxPerSec;
-    waveEl.scrollLeft = newCenterPx - containerWidth / 2;
-
-    title.innerText =
-      "Click and drag the waveform";
-  }
 
   let isDown = false;
   let startX = 0;
@@ -740,49 +751,6 @@ function setupZoomAndScrollHandlers(wave) {
     dragMomentumId = requestAnimationFrame(dragMomentum);
   }
 
-  // let wheelVelocity = 0;
-  // let targetWheelVelocity = 0;
-  // let wheelMomentumId = null;
-  // let wheelTimeout = null;
-
-  // wave.addEventListener(
-  //   "wheel",
-  //   (e) => {
-  //     e.preventDefault();
-
-  //     const scaledDelta = e.deltaY * WHEEL_SENSITIVITY;
-  //     targetWheelVelocity += scaledDelta;
-
-  //     clearTimeout(wheelTimeout);
-  //     if (!wheelMomentumId) wheelMomentum();
-
-  //     wheelTimeout = setTimeout(() => {
-  //       targetWheelVelocity = 0;
-  //     }, WHEEL_IDLE_TIMEOUT);
-  //   },
-  //   { passive: false }
-  // );
-
-  // function wheelMomentum() {
-  //   if (targetWheelVelocity !== 0) {
-  //     wheelVelocity += (targetWheelVelocity - wheelVelocity) * WHEEL_ACCELERATION;
-  //   } else {
-  //     wheelVelocity *= WHEEL_DECELERATION;
-  //   }
-
-  //   wave.scrollLeft += wheelVelocity;
-
-  //   if (
-  //     Math.abs(wheelVelocity) > WHEEL_STOP_THRESHOLD ||
-  //     Math.abs(targetWheelVelocity) > WHEEL_STOP_THRESHOLD
-  //   ) {
-  //     wheelMomentumId = requestAnimationFrame(wheelMomentum);
-  //   } else {
-  //     wheelVelocity = 0;
-  //     targetWheelVelocity = 0;
-  //     wheelMomentumId = null;
-  //   }
-  // }
 }
 
 function initializeWaveSurfer(backend = "WebAudio") {
