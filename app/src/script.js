@@ -74,6 +74,9 @@ let playState = {
   stopRequested: false,
   intervalId: null,
 };
+let samplesPerChunk;
+let sampleRate;
+const chunkDuration = 0.02; // 10ms
 
 function updateBackground() {
   sliders.forEach((slider) => {
@@ -328,11 +331,12 @@ function normalizeAudioBuffer(buffer) {
     }
   }
 }
-
+let times = [];
 function computePeaks(monoArray, sampleRate) {
-  const chunkDuration = 0.02; // 10ms
-  const samplesPerChunk = Math.floor(sampleRate * chunkDuration);
+  samplesPerChunk = Math.floor(sampleRate * chunkDuration);
   const length = monoArray.length;
+  console.log(length / samplesPerChunk);
+  
   const peaks = [];
 
   for (let i = 0; i < length; i += samplesPerChunk) {
@@ -342,11 +346,9 @@ function computePeaks(monoArray, sampleRate) {
     for (let j = i; j < end; j += 2) {
       const abs = Math.abs(monoArray[j]);
       if (abs > max) max = abs;
-      monoArray[j] = 0
     }
-
-    const time = i / sampleRate;
-    peaks.push({ time, peak: max });
+    times.push(i / sampleRate)
+    peaks.push(max);
   }
 
   return peaks;
@@ -521,9 +523,10 @@ function markSilentRegions() {
   let silent = false;
   let currentRegion = null;
 
+  
   for (let i = 0; i < precomputedPeaks.length; i++) {
-    const { peak: max, time } = precomputedPeaks[i];
-
+    let max = precomputedPeaks[i]
+    let time = times[i];
     if (max <= threshold) {
       if (!silent) {
         if (currentRegion && time - currentRegion.end < minRegionDuration) {
@@ -760,6 +763,8 @@ function initializeWaveSurfer(backend = "WebAudio") {
     container: waveformDiv,
     height: 128,
     scrollParent: false,
+    normalize: true,
+    mediaControls: true,
     waveColor: "blue",
     progressColor: "blue",
     backend,
@@ -843,7 +848,7 @@ async function handleFile(fileOrPath) {
     videoElementContainer.style.display = "flex";
     const filePath = fileOrPath.path;
     window.uploadedFile = { path: filePath }; // ✅ Set this immediately
-    const sampleRate = 220.5;
+    sampleRate = 220.5;
 
     // ✅ Updated: Only return peaks and WAV path
     title.innerHTML = "Computing peaks...";
@@ -934,17 +939,20 @@ async function handleFile(fileOrPath) {
       audioBuffer = await ctx.decodeAudioData(arrayBuffer);
       title.innerText = "sleep 30"
       sleep(30000)
-      
+
       title.innerText = "Normalizing...";
       normalizeAudioBuffer(audioBuffer); // in-place
+      sampleRate = audioBuffer.sampleRate
       precomputedPeaks = computePeaks(
         audioBuffer.getChannelData(0),
-        audioBuffer.sampleRate
+        sampleRate
       );
-      const peaks2 = precomputedPeaks.map(p => p.peak);
+
+
+      // const peaks2 = precomputedPeaks.map(p => p.peak);
       const wave = initializeWaveSurfer("MediaElement");
       setupZoomAndScrollHandlers(wave);
-      wavesurfer.load(videoElement, peaks2);
+      wavesurfer.load(videoElement, precomputedPeaks);
       autoAdjustThresholdSlider();
       handleThresholdChange();
     } catch (err) {
@@ -1140,7 +1148,7 @@ async function cutAudio() {
   // 2. Process regions with progress
   title.innerText = "Processing regions (0%)...";
   const channelData = audioBuffer.getChannelData(0);
-  const sampleRate = audioBuffer.sampleRate;
+  sampleRate = audioBuffer.sampleRate;
   let outputChunks = [];
   let lastEnd = 0;
 
