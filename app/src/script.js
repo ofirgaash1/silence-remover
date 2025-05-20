@@ -932,17 +932,19 @@ async function handleFile(fileOrPath) {
       const ctx = new AudioContext();
       title.innerText = "Decoding audio...";
       audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-
+      title.innerText = "sleep 30"
+      sleep(30000)
+      
       title.innerText = "Normalizing...";
       normalizeAudioBuffer(audioBuffer); // in-place
       precomputedPeaks = computePeaks(
         audioBuffer.getChannelData(0),
         audioBuffer.sampleRate
       );
-
-      const wave = initializeWaveSurfer();
+      const peaks2 = precomputedPeaks.map(p => p.peak);
+      const wave = initializeWaveSurfer("MediaElement");
       setupZoomAndScrollHandlers(wave);
-      wavesurfer.loadDecodedBuffer(audioBuffer);
+      wavesurfer.load(videoElement, peaks2);
       autoAdjustThresholdSlider();
       handleThresholdChange();
     } catch (err) {
@@ -958,6 +960,9 @@ async function handleFile(fileOrPath) {
   reader.readAsArrayBuffer(file);
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 ////////////////////////////
 // PREVIEW AUDIO & VIDEO
 ////////////////////////////
@@ -970,15 +975,15 @@ function isTimeInSilentRegion(time) {
   return silentRegions.some((r) => time >= r.start && time < r.end);
 }
 
-function findNextNonSilentTime(time) {
-  // Find the next time that's outside of a silent region
-  for (const region of silentRegions) {
-    if (time >= region.start && time < region.end) {
-      return region.end;
-    }
-  }
-  return null;
-}
+// function findNextNonSilentTime(time) {
+//   // Find the next time that's outside of a silent region
+//   for (const region of silentRegions) {
+//     if (time >= region.start && time < region.end) {
+//       return region.end;
+//     }
+//   }
+//   return null;
+// }
 
 function startScrollFollowLoop() {
   if (!followScroll) return;
@@ -1025,23 +1030,38 @@ function startLiveNonSilentPlayback(wave) {
     const currentTime = wavesurfer.getCurrentTime();
 
     if (isTimeInSilentRegion(currentTime)) {
-      const skipTo = findNextNonSilentTime(currentTime);
-      if (skipTo !== null) {
+      let skipTo = currentTime;
+      const maxSeekSeconds = 10; // prevent infinite search
+      const stepSize = 0.01; // 10ms steps
+      let attempts = 0;
+
+      // Look ahead until we find a non-silent region or hit limit
+      while (
+        (skipTo === currentTime || isTimeInSilentRegion(skipTo)) &&
+        attempts * stepSize < maxSeekSeconds
+      ) {
+        skipTo += stepSize;
+        attempts++;
+      }
+
+      if (skipTo > currentTime) {
         playVideoFrom(skipTo);
-        console.log(
-          `⏭️ Skipping silence at ${currentTime.toFixed(2)} → ${skipTo.toFixed(
-            2
-          )}`
-        );
         wavesurfer.play(skipTo);
+        console.log(
+          `⏭️ Skipping silence at ${currentTime.toFixed(2)} → ${skipTo.toFixed(2)}`
+        );
         return;
+      } else {
+        console.warn("⚠️ No non-silent region found after", currentTime);
       }
     }
   }, 50);
+
   // Start smooth scroll follow
   followScroll = true;
   startScrollFollowLoop();
 }
+
 
 function playPause() {
   if (document.getElementById("waveform").style.display == "none") {
@@ -1072,8 +1092,6 @@ function playVideoFrom(seconds) {
   videoElement.currentTime = seconds;
   videoElement.removeAttribute("controls");
   videoElement.play();
-  videoElement.removeAttribute("controls");
-  videoElement.muted = true;
   videoElement.removeAttribute("controls");
 }
 
