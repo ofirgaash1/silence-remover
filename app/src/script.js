@@ -201,7 +201,7 @@ function setupUIEvents() {
   document.addEventListener("keydown", (e) => {
     // ignore if focus is in an input, textarea, or contenteditable
     const tag = document.activeElement.tagName;
-    if ((tag === "INPUT" || tag === "TEXTAREA" || document.activeElement.isContentEditable)) {
+    if ((tag === "TEXTAREA" || document.activeElement.isContentEditable)) {
       return;
     }
     // check for lowercase or uppercase “f”
