@@ -40,7 +40,7 @@
   <!-- Sliders and Controls -->
   <div class="main-layout">
     <section id="videoPreview2container">
-      <video id="videoPreview2"></video>
+      <video id="videoPreview2" muted></video>
     </section>
 
     <div class="controls">
@@ -80,24 +80,38 @@
         </div>
       </div>
 
-      <div class="format-controls">
+      <!-- <div class="format-controls">
         <label>Audio Output Format:</label>
         <button class="fmt-btn selected" data-format="mp3">MP3 ✓</button>
         <button class="fmt-btn" data-format="wav">WAV</button>
-      </div>
+      </div> -->
 
       <div class="button-row">
-        <button id="Play-Non-Silent">▶️ Play</button>
-        <button id="cutAudio">Export Audio</button>
-        <button id="cutVideoBtn">Export Video</button>
-        <button id="invert">Invert</button>
+        <button id="cutAudio">Export MP3</button>
+        <button id="cutVideoBtn">Export MP4</button>
+        <button id="invert">Invert Selection</button>
       </div>
     </div>
 
   </div>
+  <!-- under your controls, before the footer -->
+  <div class="bottom-row">
+    <section class="keyboard-shortcuts">
+      <h2>Keyboard Shortcuts</h2>
+      <ul>
+        <li><span class="key"><kbd>Space Bar</kbd></span><span class="description">▶ Play ⏸ Pause</span></li>
+        <li><span class="key"><kbd>F</kbd></span><span class="description">⛶ Fullscreen</span></li>
+        <li><span class="key"><kbd>S</kbd></span><span class="description">⏪ Jump to start</span></li>
+        <li><span class="key"><kbd>&larr; LEFT</kbd></span><span class="description">Rewind 10 sec</span></li>
+        <li><span class="key"><kbd>RIGHT &rarr;</kbd></span><span class="description">Forward 10 sec</span></li>
+      </ul>
+    </section>
 
-  <!-- Statistics Panel -->
-  <div id="statsPanel">Time saved: 0s - 0% shorter - 0 silence regions</div>
+    <div id="statsPanel">
+      Time saved: 0s – 0% shorter – 0 silence regions
+    </div>
+  </div>
+
 
 
   <audio id="audioPreview" controls></audio>
