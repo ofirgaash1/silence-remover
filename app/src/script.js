@@ -54,6 +54,8 @@ const videoElement = document.getElementById("videoPreview2");
 const videoElementContainer = document.getElementById("videoPreview2container");
 //const PlayNonSilent = document.getElementById("Play-Non-Silent");
 const sliders = document.querySelectorAll('input[type="range"]');
+const currentTimeSpan = document.getElementById('currentTime');
+const durationSpan = document.getElementById('duration');
 
 let wave = null;
 let wavesurfer = null;
@@ -131,7 +133,17 @@ function setupUIEvents() {
     handleShrinkChange();
   });
 
+  videoPreview2.addEventListener('loadedmetadata', () => {
+    const mins = Math.floor(videoPreview2.duration / 60);
+    const secs = Math.floor(videoPreview2.duration % 60).toString().padStart(2, '0');
+    durationSpan.textContent = `${mins}:${secs}`;
+  });
 
+  videoPreview2.addEventListener('timeupdate', () => {
+    const mins = Math.floor(videoPreview2.currentTime / 60);
+    const secs = Math.floor(videoPreview2.currentTime % 60).toString().padStart(2, '0');
+    currentTimeSpan.textContent = `${mins}:${secs}`;
+  });
 
   document
     .getElementById("invert")
@@ -1617,3 +1629,6 @@ function scroll(duration) {
 
   requestAnimationFrame(step);
 }
+
+
+

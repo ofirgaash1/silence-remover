@@ -171,7 +171,7 @@ browseBtn:hover {
   /* stretch to match video height */
   gap: 20px;
   width: 100%;
-  padding: 20px;
+  padding: 0 20px;
   box-sizing: border-box;
 }
 
@@ -430,12 +430,12 @@ browseBtn:hover {
   align-items: flex-start;     /* top-align them */
   justify-content: center;      /* center the whole group */
   gap: 24px;                    /* space between shortcuts & stats */
-  margin: 20px auto;            /* vertical spacing */
+  margin: 10px auto;            /* vertical spacing */
   max-width: 800px;             /* optional: constrain width of the row */
 }
 
 #statsPanel {
-  min-width: 50vw;
+  min-width: 56vw;
   flex: 1 1 auto;
   font-size: 18px;
   font-weight: bold;
@@ -496,4 +496,14 @@ button#invert:hover {
 .keyboard-shortcuts .description {
   flex: 1;
   padding-left: 10px;
+}
+
+.video-timestamp {
+  max-width: 500px; /* optional limit */
+  margin: 10px 12vw;
+  font-family: 'Comic Sans MS', cursive, sans-serif; /* Or a hand-drawn style */
+  font-size: 1rem;
+  font-weight: bold;
+  text-align: left;
+  color: rgb(123, 117, 117);
 }
