@@ -286,6 +286,7 @@ browseBtn:hover {
   font-size: 14px;
   line-height: 1;
 }
+
 /* 
 /* Audio format buttons */
 /* .format-controls {
@@ -301,7 +302,7 @@ browseBtn:hover {
 .format-controls .selected {
   background-color: #3498db;
   color: white;
-} */ 
+} */
 
 /* Player & export buttons */
 
@@ -344,6 +345,7 @@ browseBtn:hover {
 }
 
 .theme-toggle {
+  all: unset;
   position: fixed;
   top: 10px;
   left: 10px;
@@ -387,13 +389,13 @@ browseBtn:hover {
 
 .keyboard-shortcuts {
   margin-right: 10vw;
-  flex: 0 0 250px;      
+  flex: 0 0 250px;
   max-width: 300px;
   padding: 20px 36px;
   background: var(--card-bg);
   color: var(--text-color);
   border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   font-size: 0.95rem;
   text-align: left;
 }
@@ -422,18 +424,23 @@ browseBtn:hover {
   color: var(--text-color);
   border: 1px solid var(--input-border);
   border-radius: 4px;
-  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.2);
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.2);
 }
 
 .bottom-row {
   display: flex;
-  align-items: flex-start;     /* top-align them */
-  justify-content: center;      /* center the whole group */
-  gap: 24px;                    /* space between shortcuts & stats */
+  align-items: flex-start;
+  /* top-align them */
+  justify-content: center;
+  /* center the whole group */
+  gap: 24px;
+  /* space between shortcuts & stats */
   margin-top: 10px;
-  margin: 10px auto;            /* vertical spacing */
+  margin: 10px auto;
+  /* vertical spacing */
   margin-bottom: 0;
-  max-width: 800px;             /* optional: constrain width of the row */
+  max-width: 800px;
+  /* optional: constrain width of the row */
 }
 
 #statsPanel {
@@ -446,7 +453,8 @@ browseBtn:hover {
   border-radius: 10px;
   max-width: 700px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
-  margin: 0;                   /* ← override the old margins */
+  margin: 0;
+  /* ← override the old margins */
   transition: background 0.3s ease, color 0.3s ease;
 }
 
@@ -462,9 +470,10 @@ button {
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.2s ease,
-              color      0.2s ease,
-              border-color 0.2s ease;
+    color 0.2s ease,
+    border-color 0.2s ease;
 }
+
 
 /* hover “fills in” the outline */
 button:hover {
@@ -478,6 +487,7 @@ button#invert {
   color: var(--text-color);
   border-color: var(--input-border);
 }
+
 button#invert:hover {
   /* if you still want hover on invert: */
   background: #7e7e7e;
@@ -491,7 +501,8 @@ button#invert:hover {
 }
 
 .keyboard-shortcuts .key {
-  width: 100px; /* fixed width for key column */
+  width: 100px;
+  /* fixed width for key column */
   flex-shrink: 0;
 }
 
@@ -501,9 +512,11 @@ button#invert:hover {
 }
 
 .video-timestamp {
-  max-width: 500px; /* optional limit */
+  max-width: 500px;
+  /* optional limit */
   margin: 10px 12vw;
-  font-family: 'Comic Sans MS', cursive, sans-serif; /* Or a hand-drawn style */
+  font-family: 'Comic Sans MS', cursive, sans-serif;
+  /* Or a hand-drawn style */
   font-size: 1rem;
   font-weight: bold;
   text-align: left;

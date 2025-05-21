@@ -60,9 +60,9 @@
 
 
 <body>
-  <div id="themeToggle" class="theme-toggle">
-    <span id="themeIcon">🌙</span>
-  </div>
+  <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
+    <span id="themeIcon" aria-hidden="true">🌙</span>
+  </button>
   <form action="https://www.paypal.com/donate" method="post" target="_top" class="donate-form">
     <input type="hidden" name="hosted_button_id" value="MRJF9A83YR2BE" />
     <input type="image" alt="Donate with PayPal" src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif"
@@ -90,7 +90,7 @@
 
   <!-- <button id="Fullscreen">⛶ Fullscreen</button> -->
   <!-- Sliders and Controls -->
-  <div class="main-layout">
+  <main  class="main-layout">
     <section id="videoPreview2container">
       <video id="videoPreview2" muted></video>
     </section>
@@ -100,7 +100,7 @@
       <div class="control-group">
         <label for="zoomSlider" class="slider-label">Zoom:</label>
         <div class="slider-row">
-          <input type="range" id="zoomSlider" min="0" max="8" value="0" step="0.08" />
+          <input type="range" id="zoomSlider" name="zoomSlider" min="0" max="8" value="0" step="0.08" />
           <div class="input-wrap">
             <div class="input-wrap">
               <input type="number" id="zoomInput" step="0.01" />
@@ -113,7 +113,7 @@
       <div class="control-group">
         <label for="thresholdSlider" class="slider-label">Amplitude Threshold:</label>
         <div class="slider-row">
-          <input type="range" id="thresholdSlider" min="0" max="100" step="0.01" />
+          <input type="range" id="thresholdSlider" name="thresholdSlider" min="0" max="100" step="0.01" />
           <div class="input-wrap">
             <input type="number" id="thresholdInput" step="0.01" />
             <span>%</span>
@@ -124,7 +124,7 @@
       <div class="control-group">
         <label for="shrinkSlider" class="slider-label">Shrink Silence:</label>
         <div class="slider-row">
-          <input type="range" id="shrinkSlider" min="0" value="0" max="1000" step="1" />
+          <input type="range" id="shrinkSlider" name="shrinkSlider" min="0" value="0" max="1000" step="1" />
           <div class="input-wrap">
             <input type="number" id="shrinkInput" step="1" />
             <span>ms</span>
@@ -145,7 +145,8 @@
       </div>
     </div>
 
-  </div>
+  </main >
+  
   <div class="video-timestamp">
     <span id="currentTime">0:00</span> / <span id="duration">0:00</span>
   </div>
