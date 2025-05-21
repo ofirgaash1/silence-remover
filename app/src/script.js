@@ -38,7 +38,7 @@ const fileInput = document.getElementById("audioFile");
 const thresholdInput = document.getElementById("thresholdInput");
 const shrinkSlider = document.getElementById("shrinkSlider");
 const shrinkInput = document.getElementById("shrinkInput");
-const formatButtons = document.querySelectorAll(".fmt-btn");
+// const formatButtons = document.querySelectorAll(".fmt-btn");
 const cutButton = document.getElementById("cutAudio");
 const audioPreview = document.getElementById("audioPreview");
 const downloadBtn = document.getElementById("AudioDownloadBtn");
@@ -52,7 +52,7 @@ const thresholdLine = document.getElementById("thresholdLine");
 const waveform = document.getElementById("waveform");
 const videoElement = document.getElementById("videoPreview2");
 const videoElementContainer = document.getElementById("videoPreview2container");
-const PlayNonSilent = document.getElementById("Play-Non-Silent");
+//const PlayNonSilent = document.getElementById("Play-Non-Silent");
 const sliders = document.querySelectorAll('input[type="range"]');
 
 let wave = null;
@@ -74,9 +74,6 @@ let playState = {
   stopRequested: false,
   intervalId: null,
 };
-let samplesPerChunk;
-let sampleRate;
-const chunkDuration = 0.02; // 10ms
 
 function updateBackground() {
   sliders.forEach((slider) => {
@@ -134,29 +131,23 @@ function setupUIEvents() {
     handleShrinkChange();
   });
 
-  document.addEventListener("keydown", function (event) {
-    // Check if the spacebar was pressed
-    if (event.code === "Space") {
-      event.preventDefault(); // Prevent scrolling
-      playPause(); // Your function to toggle play/pause
-    }
-  });
+
 
   document
     .getElementById("invert")
     .addEventListener("click", invertSilentRegions);
 
-  formatButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      formatButtons.forEach((b) => {
-        b.classList.remove("selected");
-        b.innerText = b.dataset.format.toUpperCase();
-      });
-      btn.classList.add("selected");
-      btn.innerText = `${btn.dataset.format.toUpperCase()} ✓`;
-      outputFormat = btn.dataset.format;
-    });
-  });
+  // formatButtons.forEach((btn) => {
+  //   btn.addEventListener("click", () => {
+  //     formatButtons.forEach((b) => {
+  //       b.classList.remove("selected");
+  //       b.innerText = b.dataset.format.toUpperCase();
+  //     });
+  //     btn.classList.add("selected");
+  //     btn.innerText = `${btn.dataset.format.toUpperCase()} ✓`;
+  //     outputFormat = btn.dataset.format;
+  //   });
+  // });
 
   cutButton.addEventListener("click", cutAudio);
   downloadBtn.addEventListener("click", () => {
@@ -191,9 +182,9 @@ function setupUIEvents() {
   });
   videoElementContainer.classList.add("small");
 
-  PlayNonSilent.addEventListener("click", () => {
-    playPause();
-  });
+  // PlayNonSilent.addEventListener("click", () => {
+  //   playPause();
+  // });
 
   document.addEventListener("keydown", (e) => {
     // ignore if focus is in an input, textarea, or contenteditable
@@ -205,6 +196,28 @@ function setupUIEvents() {
     if (e.key.toLowerCase() === "f") {
       e.preventDefault();   // prevents page scroll or other defaults
       togglePreview();
+    }
+
+    if (e.key.toLowerCase() === "s") {
+      e.preventDefault();   // prevents page scroll or other defaults
+      wavesurfer.seekTo(0);
+    }
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      wavesurfer.skip(-10)
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      wavesurfer.skip(10);
+    }
+
+  });
+
+  document.addEventListener("keydown", function (event) {
+    // Check if the spacebar was pressed
+    if (event.code === "Space") {
+      event.preventDefault(); // Prevent scrolling
+      playPause(); // Your function to toggle play/pause
     }
   });
 
@@ -222,7 +235,7 @@ function togglePreview() {
 
 function resetUIState() {
   console.warn("inside resetUIState()");
-  updatePlayButtonUI("start");
+  //updatePlayButtonUI("start");
   if (wavesurfer) {
     wavesurfer.destroy();
     wavesurfer = null;
@@ -331,12 +344,11 @@ function normalizeAudioBuffer(buffer) {
     }
   }
 }
-let times = [];
+
 function computePeaks(monoArray, sampleRate) {
-  samplesPerChunk = Math.floor(sampleRate * chunkDuration);
+  const chunkDuration = 0.02; // 10ms
+  const samplesPerChunk = Math.floor(sampleRate * chunkDuration);
   const length = monoArray.length;
-  console.log(length / samplesPerChunk);
-  
   const peaks = [];
 
   for (let i = 0; i < length; i += samplesPerChunk) {
@@ -346,9 +358,11 @@ function computePeaks(monoArray, sampleRate) {
     for (let j = i; j < end; j += 2) {
       const abs = Math.abs(monoArray[j]);
       if (abs > max) max = abs;
+      monoArray[j] = 0
     }
-    times.push(i / sampleRate)
-    peaks.push(max);
+
+    const time = i / sampleRate;
+    peaks.push({ time, peak: max });
   }
 
   return peaks;
@@ -523,10 +537,9 @@ function markSilentRegions() {
   let silent = false;
   let currentRegion = null;
 
-  
   for (let i = 0; i < precomputedPeaks.length; i++) {
-    let max = precomputedPeaks[i]
-    let time = times[i];
+    const { peak: max, time } = precomputedPeaks[i];
+
     if (max <= threshold) {
       if (!silent) {
         if (currentRegion && time - currentRegion.end < minRegionDuration) {
@@ -762,9 +775,8 @@ function initializeWaveSurfer(backend = "WebAudio") {
     cursorWidth: 1.5,
     container: waveformDiv,
     height: 128,
-    scrollParent: false,
     normalize: true,
-    mediaControls: true,
+    scrollParent: false,
     waveColor: "blue",
     progressColor: "blue",
     backend,
@@ -774,7 +786,7 @@ function initializeWaveSurfer(backend = "WebAudio") {
   wavesurfer.on("finish", () => {
     console.log("✅ Playback finished");
     playState.isPlaying = false;
-    updatePlayButtonUI("play");
+    //updatePlayButtonUI("play");
   });
   return document.querySelector("#waveform wave");
 }
@@ -848,7 +860,7 @@ async function handleFile(fileOrPath) {
     videoElementContainer.style.display = "flex";
     const filePath = fileOrPath.path;
     window.uploadedFile = { path: filePath }; // ✅ Set this immediately
-    sampleRate = 220.5;
+    const sampleRate = 220.5;
 
     // ✅ Updated: Only return peaks and WAV path
     title.innerHTML = "Computing peaks...";
@@ -937,22 +949,17 @@ async function handleFile(fileOrPath) {
       const ctx = new AudioContext();
       title.innerText = "Decoding audio...";
       audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-      title.innerText = "sleep 30"
-      sleep(30000)
 
       title.innerText = "Normalizing...";
       normalizeAudioBuffer(audioBuffer); // in-place
-      sampleRate = audioBuffer.sampleRate
       precomputedPeaks = computePeaks(
         audioBuffer.getChannelData(0),
-        sampleRate
+        audioBuffer.sampleRate
       );
 
-
-      // const peaks2 = precomputedPeaks.map(p => p.peak);
-      const wave = initializeWaveSurfer("MediaElement");
+      const wave = initializeWaveSurfer();
       setupZoomAndScrollHandlers(wave);
-      wavesurfer.load(videoElement, precomputedPeaks);
+      wavesurfer.loadDecodedBuffer(audioBuffer);
       autoAdjustThresholdSlider();
       handleThresholdChange();
     } catch (err) {
@@ -968,30 +975,27 @@ async function handleFile(fileOrPath) {
   reader.readAsArrayBuffer(file);
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 ////////////////////////////
 // PREVIEW AUDIO & VIDEO
 ////////////////////////////
 
-function updatePlayButtonUI(mode) {
-  PlayNonSilent.innerText = mode === "stop" ? "⏹ Stop" : "▶️ Play";
-}
+// function updatePlayButtonUI(mode) {
+//   PlayNonSilent.innerText = mode === "stop" ? "⏹ Stop" : "▶️ Play";
+// }
 
 function isTimeInSilentRegion(time) {
   return silentRegions.some((r) => time >= r.start && time < r.end);
 }
 
-// function findNextNonSilentTime(time) {
-//   // Find the next time that's outside of a silent region
-//   for (const region of silentRegions) {
-//     if (time >= region.start && time < region.end) {
-//       return region.end;
-//     }
-//   }
-//   return null;
-// }
+function findNextNonSilentTime(time) {
+  // Find the next time that's outside of a silent region
+  for (const region of silentRegions) {
+    if (time >= region.start && time < region.end) {
+      return region.end;
+    }
+  }
+  return null;
+}
 
 function startScrollFollowLoop() {
   if (!followScroll) return;
@@ -1018,7 +1022,7 @@ function startLiveNonSilentPlayback(wave) {
   const currentTime = wavesurfer.getCurrentTime();
   playState.stopRequested = false;
   playState.isPlaying = true;
-  updatePlayButtonUI("stop");
+  //updatePlayButtonUI("stop");
   wavesurfer.play();
   playVideoFrom(currentTime);
 
@@ -1031,56 +1035,41 @@ function startLiveNonSilentPlayback(wave) {
       followScroll = false;
       wavesurfer.pause();
       playState.isPlaying = false;
-      updatePlayButtonUI("play");
+      //updatePlayButtonUI("play");
       return;
     }
 
     const currentTime = wavesurfer.getCurrentTime();
 
     if (isTimeInSilentRegion(currentTime)) {
-      let skipTo = currentTime;
-      const maxSeekSeconds = 10; // prevent infinite search
-      const stepSize = 0.01; // 10ms steps
-      let attempts = 0;
-
-      // Look ahead until we find a non-silent region or hit limit
-      while (
-        (skipTo === currentTime || isTimeInSilentRegion(skipTo)) &&
-        attempts * stepSize < maxSeekSeconds
-      ) {
-        skipTo += stepSize;
-        attempts++;
-      }
-
-      if (skipTo > currentTime) {
+      const skipTo = findNextNonSilentTime(currentTime);
+      if (skipTo !== null) {
         playVideoFrom(skipTo);
-        wavesurfer.play(skipTo);
         console.log(
-          `⏭️ Skipping silence at ${currentTime.toFixed(2)} → ${skipTo.toFixed(2)}`
+          `⏭️ Skipping silence at ${currentTime.toFixed(2)} → ${skipTo.toFixed(
+            2
+          )}`
         );
+        wavesurfer.play(skipTo);
         return;
-      } else {
-        console.warn("⚠️ No non-silent region found after", currentTime);
       }
     }
   }, 50);
-
   // Start smooth scroll follow
   followScroll = true;
   startScrollFollowLoop();
 }
-
 
 function playPause() {
   if (document.getElementById("waveform").style.display == "none") {
     console.log("no waveform");
     if (textState) {
       console.log("was playing");
-      updatePlayButtonUI("stop");
+      //updatePlayButtonUI("stop");
       textState = false;
     } else {
       console.log("was stopped");
-      updatePlayButtonUI("start");
+      //updatePlayButtonUI("start");
       textState = true;
     }
     return;
@@ -1100,6 +1089,8 @@ function playVideoFrom(seconds) {
   videoElement.currentTime = seconds;
   videoElement.removeAttribute("controls");
   videoElement.play();
+  videoElement.removeAttribute("controls");
+  videoElement.muted = true;
   videoElement.removeAttribute("controls");
 }
 
@@ -1148,7 +1139,7 @@ async function cutAudio() {
   // 2. Process regions with progress
   title.innerText = "Processing regions (0%)...";
   const channelData = audioBuffer.getChannelData(0);
-  sampleRate = audioBuffer.sampleRate;
+  const sampleRate = audioBuffer.sampleRate;
   let outputChunks = [];
   let lastEnd = 0;
 
