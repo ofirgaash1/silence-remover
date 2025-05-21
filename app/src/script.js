@@ -205,19 +205,21 @@ function setupUIEvents() {
       return;
     }
     // check for lowercase or uppercase “f”
-    if (e.key.toLowerCase() === "f") {
-      e.preventDefault();   // prevents page scroll or other defaults
+    if (e.code === "KeyF") {
+      e.preventDefault();
       togglePreview();
     }
 
-    if (e.key.toLowerCase() === "s") {
-      e.preventDefault();   // prevents page scroll or other defaults
+    if (e.code === "KeyS") {
+      e.preventDefault();
       wavesurfer.seekTo(0);
     }
+
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       wavesurfer.skip(-10)
     }
+    
     if (e.key === "ArrowRight") {
       e.preventDefault();
       wavesurfer.skip(10);
