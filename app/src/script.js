@@ -199,12 +199,9 @@ function setupUIEvents() {
   // });
 
   document.addEventListener("keydown", (e) => {
-    // ignore if focus is in an input, textarea, or contenteditable
     const tag = document.activeElement.tagName;
-    if ((tag === "TEXTAREA" || document.activeElement.isContentEditable)) {
-      return;
-    }
-    // check for lowercase or uppercase “f”
+    if (tag === "TEXTAREA" || document.activeElement.isContentEditable) return;
+
     if (e.code === "KeyF") {
       e.preventDefault();
       togglePreview();
@@ -213,19 +210,26 @@ function setupUIEvents() {
     if (e.code === "KeyS") {
       e.preventDefault();
       wavesurfer.seekTo(0);
+      videoElement.currentTime = 0;
     }
 
     if (e.key === "ArrowLeft") {
       e.preventDefault();
-      wavesurfer.skip(-10)
-    }
-    
-    if (e.key === "ArrowRight") {
-      e.preventDefault();
-      wavesurfer.skip(10);
+      const newTime = Math.max(0, videoElement.currentTime - 10);
+      videoElement.currentTime = newTime;
+      wavesurfer.skip(-10);
     }
 
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      const newTime = Math.min(videoElement.duration, videoElement.currentTime + 10);
+      videoElement.currentTime = newTime;
+      wavesurfer.skip(10);
+    }
   });
+
+
+
 
   document.addEventListener("keydown", function (event) {
     // Check if the spacebar was pressed
@@ -802,6 +806,11 @@ function initializeWaveSurfer(backend = "WebAudio") {
     playState.isPlaying = false;
     //updatePlayButtonUI("play");
   });
+  wavesurfer.on('seek', function (progress) {
+    console.log("seeking!!!!");
+    
+    videoElement.currentTime = progress * videoElement.duration;
+  });
   return document.querySelector("#waveform wave");
 }
 
@@ -1075,6 +1084,10 @@ function startLiveNonSilentPlayback(wave) {
 }
 
 function playPause() {
+  if (!wavesurfer) {
+    return;
+  }
+
   if (document.getElementById("waveform").style.display == "none") {
     console.log("no waveform");
     if (textState) {
