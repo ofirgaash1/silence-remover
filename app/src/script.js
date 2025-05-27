@@ -322,6 +322,7 @@ function applyShrinkFilter(shrinkMs, minRegionDuration) {
 ///////////////////////
 
 function normalizeAudioBuffer(buffer) {
+  return;
   const numChannels = buffer.numberOfChannels;
   const length = buffer.length;
 
@@ -372,11 +373,10 @@ function computePeaks(monoArray, sampleRate) {
   for (let i = 0; i < length; i += samplesPerChunk) {
     let max = 0;
     const end = Math.min(i + samplesPerChunk, length);
-
+    
     for (let j = i; j < end; j += 2) {
       const abs = Math.abs(monoArray[j]);
       if (abs > max) max = abs;
-      monoArray[j] = 0
     }
 
     const time = i / sampleRate;
@@ -808,7 +808,7 @@ function initializeWaveSurfer(backend = "WebAudio") {
   });
   wavesurfer.on('seek', function (progress) {
     console.log("seeking!!!!");
-    
+
     videoElement.currentTime = progress * videoElement.duration;
   });
   return document.querySelector("#waveform wave");
@@ -923,7 +923,7 @@ async function handleFile(fileOrPath) {
     const arrayBuffer = await window.ElectronAPI.getNormalizedWavBuffer();
     const blob = new Blob([arrayBuffer], { type: "audio/wav" });
     const url = URL.createObjectURL(blob);
-    const wave = initializeWaveSurfer("WebAudio");
+    const wave = initializeWaveSurfer();
     setupZoomAndScrollHandlers(wave);
     wavesurfer.load(url);
 
