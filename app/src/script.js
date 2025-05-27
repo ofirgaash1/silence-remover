@@ -534,7 +534,11 @@ function autoAdjustThresholdSlider() {
 
   // Restore slider state
   thresholdSlider.value = 27;
+  thresholdInput.value = 27;
   shrinkSlider.value = 40;
+  shrinkInput.value = 40;
+  zoomInput.value = 0;
+  zoomSlider.value = 0;
 
   handleThresholdChange(); // reapply current threshold
   console.log(
@@ -790,6 +794,7 @@ function setupZoomAndScrollHandlers(wave) {
 function initializeWaveSurfer(backend = "WebAudio") {
   console.log("🛠️ Creating WaveSurfer with backend:", backend);
   wavesurfer = WaveSurfer.create({
+    responsive: true,
     cursorWidth: 1.5,
     container: waveformDiv,
     height: 128,
