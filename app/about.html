@@ -68,115 +68,22 @@
     <input type="image" alt="Donate with PayPal" src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif"
       border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
   </form>
-  <a href="./about.html">need instructions?</a>
-  <h1 id="title">Audio & Video Silence Remover</h1>
+  <a href="/app/index.html">need instructions?</a>
+  <h1 id="title">Instructions</h1>
 
   <!-- Drag & Drop or Browse Area -->
-  <div id="drop-zone" class="drop-zone">
-    <div id="drop-zone-text">
-      <p>
-        Drag & drop an audio or video file here<br />or
-        <button id="browseBtn">Choose File</button>
-      </p>
-      <input type="file" id="audioFile" accept="audio/*,video/*,.mov" style="display: none" />
-    </div>
-  </div>
-
-  <!-- Waveform Container -->
-  <div id="waveformContainer" style="position: relative">
-    <div id="waveform" class="waveform" style="display: none"></div>
-    <div id="thresholdLine"></div>
-  </div>
-
-  <!-- <button id="Fullscreen">⛶ Fullscreen</button> -->
-  <!-- Sliders and Controls -->
-  <main  class="main-layout">
-    <section id="videoPreview2container">
-      <video id="videoPreview2" muted></video>
-    </section>
-
-    <div class="controls">
-
-      <div class="control-group">
-        <label for="zoomSlider" class="slider-label">Zoom:</label>
-        <div class="slider-row">
-          <input type="range" id="zoomSlider" name="zoomSlider" min="0" max="8" value="0" step="0.08" />
-          <div class="input-wrap">
-            <div class="input-wrap">
-              <input type="number" id="zoomInput" step="0.01" />
-              <span>%</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="control-group">
-        <label for="thresholdSlider" class="slider-label">Amplitude Threshold:</label>
-        <div class="slider-row">
-          <input type="range" id="thresholdSlider" name="thresholdSlider" min="0" max="100" step="0.01" />
-          <div class="input-wrap">
-            <input type="number" id="thresholdInput" step="0.01" />
-            <span>%</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="control-group">
-        <label for="shrinkSlider" class="slider-label">Shrink Silence:</label>
-        <div class="slider-row">
-          <input type="range" id="shrinkSlider" name="shrinkSlider" min="0" value="0" max="1000" step="1" />
-          <div class="input-wrap">
-            <input type="number" id="shrinkInput" step="1" />
-            <span>ms</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- <div class="format-controls">
-        <label>Audio Output Format:</label>
-        <button class="fmt-btn selected" data-format="mp3">MP3 ✓</button>
-        <button class="fmt-btn" data-format="wav">WAV</button>
-      </div> -->
-
-      <div class="button-row">
-        <button id="cutAudio">Export MP3</button>
-        <button id="cutVideoBtn">Export MP4</button>
-        <button id="invert">Invert Selection</button>
-      </div>
-    </div>
-
-  </main >
-  
-  <div class="video-timestamp">
-    <span id="currentTime">0:00</span> / <span id="duration">0:00</span>
-  </div>
-  <!-- under your controls, before the footer -->
-  <div class="bottom-row">
-    <section class="keyboard-shortcuts">
-      <h2>Keyboard Shortcuts</h2>
-      <ul>
-        <li><span class="key"><kbd>Space Bar</kbd></span><span class="description">▶ Play ⏸ Pause</span></li>
-        <li><span class="key"><kbd>F</kbd></span><span class="description">⛶ Fullscreen</span></li>
-        <li><span class="key"><kbd>S</kbd></span><span class="description">⏪ Jump to start</span></li>
-        <li><span class="key"><kbd>&larr; LEFT</kbd></span><span class="description">Rewind 10 sec</span></li>
-        <li><span class="key"><kbd>RIGHT &rarr;</kbd></span><span class="description">Forward 10 sec</span></li>
-      </ul>
-    </section>
-
-    <div id="statsPanel">
-      Time saved: 0s – 0% shorter – 0 silence regions
-    </div>
+  <div>
+      <li>Choose a video or audio from your pc</li>
+      <li>tweak the sliders</li>
+      <li>your goal is that only quite parts will be marked red</li>
+      <li>press space to listen to a preview</li>
+      <li>sounds good? you can click export</li>
+      <li>save the file and name it as you'd like</li>
+      <li>done</li>
   </div>
 
 
 
-  <audio id="audioPreview" controls></audio>
-  <br />
-  <button id="AudioDownloadBtn" class="download-btn">Download Audio</button>
-
-  <!-- Video Preview -->
-  <br />
-  <button id="downloadVideoBtn" class="download-btn">Download Video</button>
 
   <!-- Processing Indicator -->
   <footer class="bug-report">
@@ -184,10 +91,6 @@
     <a href="mailto:ofir.gaash@gmail.com">ofir.gaash@gmail.com</a>
   </footer>
 
-  <!-- Script dependencies -->
-  <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
-  <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
-  <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
 
   <script type="module" src="./src/script.js"></script>
   <script>
