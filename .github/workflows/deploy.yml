@@ -7,7 +7,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: [ofirVM]
+    runs-on: [azure]
 
     steps:
       - name: Checkout code
