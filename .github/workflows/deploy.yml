@@ -30,6 +30,21 @@ jobs:
       - name: Build containers (no cache)
         run: docker compose -f docker-compose.prod.yml build --no-cache
 
+
+      # 🔐 Login to Docker Hub (you need to set DOCKERHUB_USERNAME and DOCKERHUB_TOKEN in repo secrets)
+      - name: Docker login
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      # 🏷️ Tag the image
+      - name: Tag Docker image
+        run: |
+          docker tag silence-remover ofirgaash/silence-remover:tagname
+
+      # 📤 Push to Docker Hub
+      - name: Push Docker image
+        run: docker push ofirgaash/silence-remover:tagname
+
+
       - name: Deploy
         run: docker compose -f docker-compose.prod.yml up -d --force-recreate web
 
