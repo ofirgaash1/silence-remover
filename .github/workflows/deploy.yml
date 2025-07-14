@@ -2,7 +2,7 @@ name: azure CI/CD Pipeline
 
 on:
   push:
-    branches: [ bynet ]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
