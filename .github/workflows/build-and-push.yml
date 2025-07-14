@@ -4,8 +4,8 @@ name: Build and Push to Docker Hub
 
 on:
   push:
-    branches: [main] 
-    
+    branches: [bynet]  # change to 'main' after testing is done!!!
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
