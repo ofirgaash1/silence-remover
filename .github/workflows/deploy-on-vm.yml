@@ -4,7 +4,7 @@ name: Deploy on Azure VM
 
 on:
   push:
-    branches: [bynet]  # טריגר מיידי על פוש
+    branches: [main]  
 
 jobs:
   deploy:
