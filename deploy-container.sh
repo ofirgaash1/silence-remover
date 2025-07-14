@@ -16,6 +16,6 @@ echo "[INFO] Starting new container..."
 docker run -d \
   --name silence-remover \
   -p 80:80 -p 443:443 \
-  -v certbot-etc:/etc/letsencrypt:ro \
-  -v certbot-var:/var/lib/letsencrypt \
+  -v /var/lib/docker/volumes/certbot-etc/_data:/etc/letsencrypt:ro \
+  -v /var/lib/docker/volumes/certbot-var/_data:/var/lib/letsencrypt \
   ofirgaash/silence-remover:latest
