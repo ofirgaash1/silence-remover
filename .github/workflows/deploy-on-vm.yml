@@ -1,0 +1,28 @@
+# .github/workflows/deploy-on-vm.yml
+
+name: Deploy on Azure VM
+
+on:
+  push:
+    branches: [bynet]  # טריגר מיידי על פוש
+
+jobs:
+  deploy:
+    runs-on: [azure]
+    steps:
+      - name: Pull latest image
+        run: docker pull ofirgaash/silence-remover:latest
+
+      - name: Stop and remove existing container
+        run: |
+          docker stop silence-remover || true
+          docker rm silence-remover || true
+
+      - name: Run updated container
+        run: |
+          docker run -d \
+            --name silence-remover \
+            -p 80:80 -p 443:443 \
+            -v certbot-etc:/etc/letsencrypt:ro \
+            -v certbot-var:/var/lib/letsencrypt \
+            ofirgaash/silence-remover:latest

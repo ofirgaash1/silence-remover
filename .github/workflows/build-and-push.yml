@@ -1,0 +1,24 @@
+# .github/workflows/build-and-push.yml
+
+name: Build and Push to Docker Hub
+
+on:
+  push:
+    branches: [bynet]  # change to 'main' after testing is done!!!
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Docker login
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t ofirgaash/silence-remover:latest ./app
+
+      - name: Push to Docker Hub
+        run: docker push ofirgaash/silence-remover:latest
