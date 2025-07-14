@@ -2,7 +2,7 @@ name: azure CI/CD Pipeline
 
 on:
   push:
-    branches: [ naster ]
+    branches: [ bynet ]
   workflow_dispatch:
 
 jobs:
