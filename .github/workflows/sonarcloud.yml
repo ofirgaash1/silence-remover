@@ -22,12 +22,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        working-directory: ./app
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@v2
         with:
-          projectBaseDir: .
+          projectBaseDir: ./app
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: your_project_key_here
-          SONAR_ORGANIZATION: ofirgaash1_silence-remover
+          SONAR_PROJECT_KEY: silence-ofirgaash1_silence
+          SONAR_ORGANIZATION: ofirgaash1
