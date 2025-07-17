@@ -29,7 +29,7 @@ jobs:
         with:
           projectBaseDir: ./app
           args: >
-            -Dsonar.projectKey=silence-ofirgaash1_silence
+            -Dsonar.projectKey=ofirgaash1_silence-remover
             -Dsonar.organization=ofirgaash1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
