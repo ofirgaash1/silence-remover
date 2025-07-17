@@ -2,9 +2,9 @@ name: SonarCloud Analysis
 
 on:
   push:
-    branches: [ bynet ]
+    branches: [ master ]
   pull_request:
-    branches: [ bynet ]
+    branches: [ master ]
 
 jobs:
   sonarcloud:
