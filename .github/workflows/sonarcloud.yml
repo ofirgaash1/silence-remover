@@ -28,7 +28,9 @@ jobs:
         uses: SonarSource/sonarcloud-github-action@v2
         with:
           projectBaseDir: ./app
+          args: >
+            -Dsonar.projectKey=silence-ofirgaash1_silence
+            -Dsonar.organization=ofirgaash1
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_PROJECT_KEY: ofirgaash1_silence-remover
-          SONAR_ORGANIZATION: ofirgaash1
+
