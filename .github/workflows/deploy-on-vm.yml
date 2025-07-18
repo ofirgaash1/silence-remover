@@ -11,7 +11,6 @@ jobs:
     runs-on: [self-hosted, linux]
 
     steps:
-    
       - name: Ensure traefik network and container exist
         run: |
           # 1. Create Docker network if it doesn't exist
@@ -43,7 +42,7 @@ jobs:
         id: vars
         run: |
           echo "IMAGE_TAG=${{ github.event.client_payload.tag }}" >> $GITHUB_ENV
-          echo "CONTAINER_NAME=silence-${{ github.event.client_payload.tag }}" >> $GITHUB_ENV
+          echo "TMP_CONTAINER=silence-${{ github.event.client_payload.tag }}-tmp" >> $GITHUB_ENV
 
       - name: Pull image from Docker Hub
         run: docker pull ofirgaash/silence-remover:${{ env.IMAGE_TAG }}
@@ -51,30 +50,30 @@ jobs:
       - name: Run new container (no Traefik labels yet)
         run: |
           docker run -d \
-            --name $CONTAINER_NAME \
+            --name "$TMP_CONTAINER" \
             --network traefik-net \
             ofirgaash/silence-remover:${{ env.IMAGE_TAG }}
-      - name: Wait for health check and restart with Traefik labels
+
+      - name: Wait for test container health
         run: |
+          echo "[INFO] Waiting for container $TMP_CONTAINER to become healthy..."
           MAX_WAIT=120
           ELAPSED=0
-          echo "[INFO] Waiting for container $CONTAINER_NAME to become healthy..."
-
-          while [[ "$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null)" != "healthy" ]]; do
+          while [[ "$(docker inspect --format='{{.State.Health.Status}}' $TMP_CONTAINER 2>/dev/null)" != "healthy" ]]; do
             sleep 5
             ELAPSED=$((ELAPSED + 5))
             if [[ "$ELAPSED" -ge "$MAX_WAIT" ]]; then
-              echo "[ERROR] Container $CONTAINER_NAME did not become healthy in time."
-              docker logs $CONTAINER_NAME
+              echo "[ERROR] $TMP_CONTAINER did not become healthy in time."
+              docker logs $TMP_CONTAINER
               exit 1
             fi
           done
 
-          echo "[INFO] Container $CONTAINER_NAME is healthy. Restarting with Traefik labels..."
-          docker rm -f "$CONTAINER_NAME"
-
+      - name: Run live container with Traefik labels
+        run: |
+          echo "[INFO] Running production container with Traefik labels..."
           docker run -d \
-            --name "$CONTAINER_NAME" \
+            --name "${{ env.CONTAINER_NAME }}" \
             --network traefik-net \
             -l traefik.enable=true \
             -l 'traefik.http.routers.silence.rule=Host("azure.ofirgaash.click")' \
@@ -83,7 +82,27 @@ jobs:
             -l traefik.http.services.silence.loadbalancer.server.port=80 \
             ofirgaash/silence-remover:${{ env.IMAGE_TAG }}
 
-      - name: Clean up old containers
+      - name: Wait for live container to become healthy
         run: |
-          echo "[INFO] Cleaning up old containers..."
-          docker ps -a --filter "name=silence-" --format "{{.Names}}" | grep -v "$CONTAINER_NAME" | xargs -r docker rm -f
+          echo "[INFO] Waiting for production container to become healthy..."
+          MAX_WAIT=120
+          ELAPSED=0
+          while [[ "$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null)" != "healthy" ]]; do
+            sleep 5
+            ELAPSED=$((ELAPSED + 5))
+            if [[ "$ELAPSED" -ge "$MAX_WAIT" ]]; then
+              echo "[ERROR] $CONTAINER_NAME did not become healthy in time."
+              docker logs $CONTAINER_NAME
+              exit 1
+            fi
+          done
+
+      - name: Cleanup old containers (excluding new one)
+        run: |
+          echo "[INFO] Cleaning up old silence-* containers (excluding $CONTAINER_NAME)..."
+          docker ps -a --filter "name=silence-" --format "{{.Names}}" | grep -v "$CONTAINER_NAME" | grep -v "$TMP_CONTAINER" | xargs -r docker rm -f
+
+      - name: Remove temp container
+        run: |
+          echo "[INFO] Removing temporary test container $TMP_CONTAINER..."
+          docker rm -f "$TMP_CONTAINER" || true
