@@ -84,6 +84,7 @@ jobs:
 
       - name: Wait for live container to become healthy
         run: |
+          source $GITHUB_ENV
           echo "[INFO] Waiting for production container to become healthy..."
           MAX_WAIT=120
           ELAPSED=0
