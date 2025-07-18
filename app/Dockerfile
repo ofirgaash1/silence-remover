@@ -11,6 +11,9 @@ COPY dist /usr/share/nginx/html
 # Set ownership to nginx user
 RUN chown -R nginx:nginx /usr/share/nginx/html
 
+RUN mkdir -p /var/cache/nginx/client_temp && \
+    chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx
+    
 # Run as non-root
 USER nginx
 
