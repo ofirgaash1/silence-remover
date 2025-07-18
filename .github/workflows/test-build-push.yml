@@ -40,21 +40,22 @@ jobs:
     needs: build-artifact
 
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: Install deps
+      - name: Install dependencies
         run: npm ci
         working-directory: ./app
 
       - name: SonarCloud Scan (with Quality Gate)
-        uses: sonarsource/sonarqube-scan-action@v2.3.0
+        uses: SonarSource/sonarqube-scan-action@v4.1.0
         with:
           projectBaseDir: ./app
           args: >
@@ -63,6 +64,8 @@ jobs:
             -Dsonar.qualitygate.wait=true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+
 
 
   dockerize-and-push:
