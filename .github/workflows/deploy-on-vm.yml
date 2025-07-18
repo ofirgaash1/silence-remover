@@ -97,8 +97,11 @@ jobs:
 
       - name: Cleanup old containers (excluding new one)
         run: |
-          echo "[INFO] Cleaning up old silence-* containers (excluding $CONTAINER_NAME and $TMP_CONTAINER)..."
-          docker ps -a --filter "name=silence-" --format "{{.Names}}" | grep -v "$CONTAINER_NAME" | grep -v "$TMP_CONTAINER" | xargs -r docker rm -f
+          echo "[INFO] Cleaning up old silence-* containers (excluding ${{ env.CONTAINER_NAME }} and ${{ env.TMP_CONTAINER }})..."
+          docker ps -a --filter "name=silence-" --format "{{.Names}}" \
+            | grep -v "${{ env.CONTAINER_NAME }}" \
+            | grep -v "${{ env.TMP_CONTAINER }}" \
+            | xargs -r docker rm -f
 
       - name: Remove temp container
         run: |
