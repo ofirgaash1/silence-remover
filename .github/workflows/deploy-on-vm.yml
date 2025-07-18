@@ -11,6 +11,33 @@ jobs:
     runs-on: [self-hosted, linux]
 
     steps:
+    
+      - name: Ensure traefik network and container exist
+        run: |
+          # 1. Create Docker network if it doesn't exist
+          if ! docker network ls --format '{{.Name}}' | grep -q "^traefik-net$"; then
+            echo "[INFO] Creating traefik-net network..."
+            docker network create traefik-net
+          else
+            echo "[INFO] traefik-net network already exists."
+          fi
+
+          # 2. Ensure traefik container is running
+          if ! docker ps --format '{{.Names}}' | grep -q "^traefik$"; then
+            echo "[INFO] Traefik container not running. Starting it..."
+            docker run -d \
+              --name traefik \
+              --network traefik-net \
+              -p 80:80 -p 443:443 -p 8080:8080 \
+              -v /var/run/docker.sock:/var/run/docker.sock:ro \
+              -v /home/ofir/silence-remover/traefik/traefik.yml:/etc/traefik/traefik.yml:ro \
+              -v /home/ofir/silence-remover/traefik/acme.json:/letsencrypt/acme.json \
+              traefik:v2.11 \
+              --configFile=/etc/traefik/traefik.yml
+          else
+            echo "[INFO] Traefik container is already running."
+          fi
+
       - name: Set deployment variables
         id: vars
         run: |
