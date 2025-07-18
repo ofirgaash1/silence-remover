@@ -1,6 +1,6 @@
 # .github/workflows/deploy-on-vm.yml
 
-name: Deploy on Azure VM
+name: Deploy to Azure VM via Traefik
 
 on:
   repository_dispatch:
@@ -8,21 +8,25 @@ on:
 
 jobs:
   deploy:
-    runs-on: [azure]
+    runs-on: [self-hosted, linux]
+
     steps:
-      - name: Pull latest image
-        run: docker pull ofirgaash/silence-remover:latest
-
-      - name: Stop and remove existing container
+      - name: Set deployment variables
+        id: vars
         run: |
-          docker stop silence-remover || true
-          docker rm silence-remover || true
+          echo "IMAGE_TAG=${{ github.event.client_payload.tag }}" >> $GITHUB_ENV
+          echo "CONTAINER_NAME=silence-${{ github.event.client_payload.tag }}" >> $GITHUB_ENV
 
-      - name: Run updated container
+      - name: Pull image from Docker Hub
+        run: docker pull ofirgaash/silence-remover:${{ env.IMAGE_TAG }}
+
+      - name: Run new container with Traefik labels
         run: |
           docker run -d \
-            --name silence-remover \
-            -p 80:80 -p 443:443 \
-            -v certbot-etc:/etc/letsencrypt:ro \
-            -v certbot-var:/var/lib/letsencrypt \
-            ofirgaash/silence-remover:latest
+            --name $CONTAINER_NAME \
+            -l traefik.enable=true \
+            -l traefik.http.routers.silence.rule=Host(`azure.ofirgaash.click`) \
+            -l traefik.http.routers.silence.entrypoints=websecure \
+            -l traefik.http.routers.silence.tls.certresolver=myresolver \
+            -l traefik.http.services.silence.loadbalancer.server.port=80 \
+            ofirgaash/silence-remover:${{ env.IMAGE_TAG }}
