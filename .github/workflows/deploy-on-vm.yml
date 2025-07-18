@@ -8,7 +8,7 @@ on:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, linux]
+    runs-on: [azure]
 
     env:
       CONTAINER_NAME: silence-${{ github.event.client_payload.tag }}
