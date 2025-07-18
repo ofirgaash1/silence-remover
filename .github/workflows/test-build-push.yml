@@ -2,7 +2,7 @@ name: Test, Build and Push to Docker Hub
 
 on:
   push:
-    branches: [none]
+    branches: [master]
 
 jobs:
   build-artifact:
