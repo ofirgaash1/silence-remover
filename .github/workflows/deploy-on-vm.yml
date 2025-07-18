@@ -16,7 +16,11 @@ jobs:
       IMAGE_TAG: ${{ github.event.client_payload.tag }}
 
     steps:
-      - name: Ensure traefik network and container exist
+      
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Ensure traefik network exists
         run: |
           # 1. Create Docker network if it doesn't exist
           if ! docker network ls --format '{{.Name}}' | grep -q "^traefik-net$"; then
@@ -29,18 +33,15 @@ jobs:
           if docker ps -a --format '{{.Names}}' | grep -q "^traefik$"; then
             echo "[INFO] Traefik container already exists. Ensuring it's running..."
             docker start traefik || true
+      - name: Ensure Traefik is running
+        run: |
+          if ! docker ps --format '{{.Names}}' | grep -q "^traefik$"; then
+            echo "[INFO] Starting Traefik with Compose..."
+            docker compose -f traefik/docker-compose.traefik.yml up -d traefik
           else
-            echo "[INFO] Traefik container not found. Creating..."
-            docker run -d \
-              --name traefik \
-              --network traefik-net \
-              -p 80:80 -p 443:443 -p 8080:8080 \
-              -v /var/run/docker.sock:/var/run/docker.sock:ro \
-              -v /home/ofir/silence-remover/traefik/traefik.yml:/etc/traefik/traefik.yml:ro \
-              -v /home/ofir/silence-remover/traefik/acme.json:/letsencrypt/acme.json \
-              traefik:v2.11 \
-              --configFile=/etc/traefik/traefik.yml
+            echo "[INFO] Traefik already running."
           fi
+
 
       - name: Pull image from Docker Hub
         run: docker pull ofirgaash/silence-remover:${{ env.IMAGE_TAG }}
