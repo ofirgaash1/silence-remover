@@ -17,29 +17,5 @@ services:
     networks:
       - traefik-net
 
-  silence-v1:
-    image: ofirgaash/silence-remover:v1.0.0
-    container_name: silence-v1
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.silence.rule=Host(`azure.ofirgaash.click`)"
-      - "traefik.http.routers.silence.entrypoints=websecure"
-      - "traefik.http.routers.silence.tls.certresolver=myresolver"
-      - "traefik.http.services.silence.loadbalancer.server.port=80"
-    networks:
-      - traefik-net
-
-  silence-v2:
-    image: ofirgaash/silence-remover:v1.0.1
-    container_name: silence-v2
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.silence.rule=Host(`azure.ofirgaash.click`)"
-      - "traefik.http.routers.silence.entrypoints=websecure"
-      - "traefik.http.routers.silence.tls.certresolver=myresolver"
-      - "traefik.http.services.silence.loadbalancer.server.port=80"
-    networks:
-      - traefik-net
-
 networks:
   traefik-net:
