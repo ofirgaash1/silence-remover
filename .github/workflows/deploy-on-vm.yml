@@ -25,7 +25,7 @@ jobs:
           docker run -d \
             --name $CONTAINER_NAME \
             -l traefik.enable=true \
-            -l traefik.http.routers.silence.rule=Host(`azure.ofirgaash.click`) \
+            -l "traefik.http.routers.silence.rule=Host(`azure.ofirgaash.click`)" \
             -l traefik.http.routers.silence.entrypoints=websecure \
             -l traefik.http.routers.silence.tls.certresolver=myresolver \
             -l traefik.http.services.silence.loadbalancer.server.port=80 \
