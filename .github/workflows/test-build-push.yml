@@ -66,8 +66,6 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
 
-
-
   dockerize-and-push:
     needs: [build-artifact, sonarcloud]
     runs-on: ubuntu-latest
