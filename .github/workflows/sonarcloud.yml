@@ -1,8 +1,10 @@
+# sonarcloud.yml
+
 name: SonarCloud Analysis
 
 on:
   push:
-    branches: [ cancel-master ]
+    branches: [ none ]
 #  pull_request:
 #    branches: [ master ]
 
