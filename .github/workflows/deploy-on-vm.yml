@@ -23,8 +23,11 @@ jobs:
           fi
 
           # 2. Ensure traefik container is running
-          if ! docker ps --format '{{.Names}}' | grep -q "^traefik$"; then
-            echo "[INFO] Traefik container not running. Starting it..."
+          if docker ps -a --format '{{.Names}}' | grep -q "^traefik$"; then
+            echo "[INFO] Traefik container already exists. Ensuring it's running..."
+            docker start traefik || true
+          else
+            echo "[INFO] Traefik container not found. Creating..."
             docker run -d \
               --name traefik \
               --network traefik-net \
@@ -34,8 +37,6 @@ jobs:
               -v /home/ofir/silence-remover/traefik/acme.json:/letsencrypt/acme.json \
               traefik:v2.11 \
               --configFile=/etc/traefik/traefik.yml
-          else
-            echo "[INFO] Traefik container is already running."
           fi
 
       - name: Set deployment variables
