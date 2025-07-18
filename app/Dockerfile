@@ -1,4 +1,6 @@
-# app/DockerfiFROM nginx:alpine
+# app/Dockerfi
+
+FROM nginx:alpine
 
 # Remove default HTML files
 RUN rm -rf /usr/share/nginx/html/*
