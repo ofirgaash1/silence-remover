@@ -19,21 +19,23 @@ echo "✅ Selected image: $IMAGE_NAME:$TAG"
 echo "🛑 Stopping all other 'silence-*' containers..."
 docker ps --filter "name=silence-" --format "{{.Names}}" | grep -v "$CONTAINER_NAME" | xargs -r docker rm -f
 
+# Remove existing container with same name
 if docker ps -a --format '{{.Names}}' | grep -q "^$CONTAINER_NAME$"; then
-  echo "ℹ️ Container $CONTAINER_NAME already exists. Restarting..."
-  docker start "$CONTAINER_NAME"
-else
-  echo "🚀 Starting rollback container: $CONTAINER_NAME"
-  docker run -d \
-    --name "$CONTAINER_NAME" \
-    --network traefik-net \
-    -l traefik.enable=true \
-    -l "traefik.http.routers.silence.rule=Host(\`azure.ofirgaash.click\`)" \
-    -l traefik.http.routers.silence.entrypoints=websecure \
-    -l traefik.http.routers.silence.tls.certresolver=myresolver \
-    -l traefik.http.services.silence.loadbalancer.server.port=80 \
-    "$IMAGE_NAME:$TAG"
+  echo "🧹 Removing existing container: $CONTAINER_NAME"
+  docker rm -f "$CONTAINER_NAME"
 fi
+
+echo "🚀 Starting rollback container: $CONTAINER_NAME"
+docker run -d \
+  --name "$CONTAINER_NAME" \
+  --network traefik-net \
+  -l traefik.enable=true \
+  -l "traefik.http.routers.silence.rule=Host(\`azure.ofirgaash.click\`)" \
+  -l traefik.http.routers.silence.entrypoints=websecure \
+  -l traefik.http.routers.silence.tls.certresolver=myresolver \
+  -l traefik.http.services.silence.loadbalancer.server.port=80 \
+  "$IMAGE_NAME:$TAG"
+
 
 
 echo "✅ Rollback to $TAG completed successfully."
