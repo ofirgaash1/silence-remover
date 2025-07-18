@@ -16,7 +16,7 @@ services:
       - "./acme.json:/letsencrypt/acme.json"
 
   app-v1:
-    build: ./app-v1
+    build: ../app-v1
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.silence.rule=Host(`azure.ofirgaash.click`)"
@@ -25,7 +25,7 @@ services:
       - "traefik.http.services.silence.loadbalancer.server.port=80"
 
   app-v2:
-    build: ./app-v2
+    build: ../app-v2
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.silence.rule=Host(`azure.ofirgaash.click`)"
