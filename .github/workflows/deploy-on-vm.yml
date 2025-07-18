@@ -24,6 +24,7 @@ jobs:
         run: |
           docker run -d \
             --name $CONTAINER_NAME \
+            --network traefik-net \
             -l traefik.enable=true \
             -l 'traefik.http.routers.silence.rule=Host("azure.ofirgaash.click")' \
             -l traefik.http.routers.silence.entrypoints=websecure \
