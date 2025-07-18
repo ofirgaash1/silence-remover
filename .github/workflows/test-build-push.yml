@@ -54,14 +54,16 @@ jobs:
         working-directory: ./app
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@v2
+        uses: sonarsource/sonarcloud-github-action@v4
         with:
           projectBaseDir: ./app
           args: >
             -Dsonar.projectKey=ofirgaash1_silence-remover
             -Dsonar.organization=ofirgaash1
+            -Dsonar.qualitygate.wait=true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
 
       - name: Wait for Quality Gate result
         uses: SonarSource/sonarcloud-quality-gate-action@v1.1.0
