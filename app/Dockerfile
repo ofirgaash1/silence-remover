@@ -1,4 +1,4 @@
-# app/Dockerfi
+# app/Dockerfile
 
 FROM nginx:alpine
 

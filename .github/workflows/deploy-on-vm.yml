@@ -16,7 +16,7 @@ jobs:
       IMAGE_TAG: ${{ github.event.client_payload.tag }}
 
     steps:
-      
+
       - name: Checkout repo
         uses: actions/checkout@v3
 
@@ -33,6 +33,7 @@ jobs:
           if docker ps -a --format '{{.Names}}' | grep -q "^traefik$"; then
             echo "[INFO] Traefik container already exists. Ensuring it's running..."
             docker start traefik || true
+          fi
       - name: Ensure Traefik is running
         run: |
           if ! docker ps --format '{{.Names}}' | grep -q "^traefik$"; then
