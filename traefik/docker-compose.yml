@@ -9,7 +9,7 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "8080:8080"
+      - "8080:8080"  # Traefik Dashboard
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./traefik.yml:/etc/traefik/traefik.yml:ro"
@@ -17,8 +17,9 @@ services:
     networks:
       - traefik-net
 
-  app-v1:
-    build: ../app-v1
+  silence-v1:
+    image: ofirgaash/silence-remover:v1.0.0
+    container_name: silence-v1
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.silence.rule=Host(`azure.ofirgaash.click`)"
@@ -28,8 +29,9 @@ services:
     networks:
       - traefik-net
 
-  app-v2:
-    build: ../app-v2
+  silence-v2:
+    image: ofirgaash/silence-remover:v1.0.1
+    container_name: silence-v2
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.silence.rule=Host(`azure.ofirgaash.click`)"
@@ -41,4 +43,3 @@ services:
 
 networks:
   traefik-net:
-
