@@ -1,21 +1,20 @@
 #!/bin/bash
 
-echo "[INFO] Waiting for Docker to start..."
-until docker info >/dev/null 2>&1; do
+source /etc/github-deploy.env
+
+# Waiting for network (optional if needed)
+until ping -c1 github.com &>/dev/null; do
+  echo "[INFO] Waiting for network..."
   sleep 2
 done
 
-echo "[INFO] Pulling latest image from Docker Hub..."
-docker pull ofirgaash/silence-remover:latest
+# Trigger deploy workflow from this VM
+echo "[INFO] Triggering GitHub deploy workflow..."
 
-echo "[INFO] Stopping old container..."
-docker stop silence-remover || true
-docker rm silence-remover || true
+curl -X POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GITHUB_PAT" \
+  https://api.github.com/repos/ofirgaash1/silence-remover/dispatches \
+  -d '{"event_type":"trigger-deploy", "client_payload": {"tag": "latest"}}'
 
-echo "[INFO] Starting new container..."
-docker run -d \
-  --name silence-remover \
-  -p 80:80 -p 443:443 \
-  -v /var/lib/docker/volumes/certbot-etc/_data:/etc/letsencrypt:ro \
-  -v /var/lib/docker/volumes/certbot-var/_data:/var/lib/letsencrypt \
-  ofirgaash/silence-remover:latest
+echo "[INFO] Deploy triggered from rc.local"
