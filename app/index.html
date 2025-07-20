@@ -93,7 +93,7 @@
 
   <!-- <button id="Fullscreen">⛶ Fullscreen</button> -->
   <!-- Sliders and Controls -->
-  <main  class="main-layout">
+  <main class="main-layout">
     <section id="videoPreview2container">
       <video id="videoPreview2" muted></video>
     </section>
@@ -148,8 +148,8 @@
       </div>
     </div>
 
-  </main >
-  
+  </main>
+
   <div class="video-timestamp">
     <span id="currentTime">0:00</span> / <span id="duration">0:00</span>
   </div>
@@ -185,6 +185,7 @@
   <footer class="bug-report">
     Found a bug?
     <a href="mailto:ofir.gaash@gmail.com">ofir.gaash@gmail.com</a>
+    <p>מספר כניסות: <span id="counter">טוען...</span></p>
   </footer>
 
   <!-- Script dependencies -->
@@ -227,7 +228,20 @@
       applyTheme(isDark ? "light" : "dark");
     });
   </script>
-
+  <script>
+    fetch("https://ofirfunc.azurewebsites.net/api/HitCounter")
+      .then(response => {
+        if (!response.ok) throw new Error("Network response was not ok");
+        return response.text();
+      })
+      .then(data => {
+        document.getElementById("counter").textContent = data;
+      })
+      .catch(error => {
+        console.error("Error fetching hit count:", error);
+        document.getElementById("counter").textContent = "שגיאה";
+      });
+  </script>
 </body>
 
 </html>
