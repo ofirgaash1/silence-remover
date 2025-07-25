@@ -48,6 +48,9 @@ jobs:
             echo "[INFO] traefik-net network already exists."
           fi
 
+      - name: Ensure acme.json is secure
+        run: chmod 600 traefik/acme.json
+
       - name: Ensure Traefik is running
         run: |
           if docker ps -a --format '{{.Names}}' | grep -q "^traefik$"; then
