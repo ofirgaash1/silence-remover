@@ -9,24 +9,30 @@ on:
 jobs:
   deploy:
     runs-on: [azure]
-
+    # pull the payload tag (if any) into CLIENT_TAG
     env:
-      # fall back to "latest" when client_payload.tag is null/empty
-      IMAGE_TAG: ${{ default(github.event.client_payload.tag, 'latest') }}
-      CONTAINER_NAME: silence-${{ default(github.event.client_payload.tag, 'latest') }}
-      TMP_CONTAINER: silence-${{ default(github.event.client_payload.tag, 'latest') }}-tmp
+      CLIENT_TAG: ${{ github.event.client_payload.tag }}
 
     steps:
-
       - name: Checkout repo
         uses: actions/checkout@v3
 
-      # ————————————
-      # NEW: Remove any leftover containers that would conflict
+      - name: Prepare deployment variables
+        # default shell is bash on GitHub-hosted runners
+        run: |
+          # if CLIENT_TAG is empty or unset, TAG => "latest"
+          TAG="${CLIENT_TAG:-latest}"
+          echo "IMAGE_TAG=$TAG"         >> "$GITHUB_ENV"
+          echo "CONTAINER_NAME=silence-$TAG"     >> "$GITHUB_ENV"
+          echo "TMP_CONTAINER=silence-${TAG}-tmp" >> "$GITHUB_ENV"
+
       - name: Prune stale containers
         run: |
           for name in "$TMP_CONTAINER" "$CONTAINER_NAME"; do
-            if docker ps -a --filter "name=^/${name}$" --format '{{.Names}}' | grep -q "^${name}$"; then
+            if docker ps -a \
+                 --filter "name=^/${name}$" \
+                 --format '{{.Names}}' \
+               | grep -q "^${name}$"; then
               echo "[INFO] Removing stale container: $name"
               docker rm -f "$name"
             fi
@@ -42,18 +48,14 @@ jobs:
             echo "[INFO] traefik-net network already exists."
           fi
 
+      - name: Ensure Traefik is running
+        run: |
           if docker ps -a --format '{{.Names}}' | grep -q "^traefik$"; then
             echo "[INFO] Traefik container already exists. Ensuring it's running..."
             docker start traefik || true
-          fi
-
-      - name: Ensure Traefik is running
-        run: |
-          if ! docker ps --format '{{.Names}}' | grep -q "^traefik$"; then
+          else
             echo "[INFO] Starting Traefik with Compose..."
             docker compose -f traefik/docker-compose.traefik.yml up -d traefik
-          else
-            echo "[INFO] Traefik already running."
           fi
 
       - name: Pull image from Docker Hub
@@ -69,17 +71,18 @@ jobs:
       - name: Wait for test container health
         run: |
           echo "[INFO] Waiting for container $TMP_CONTAINER to become healthy..."
-          MAX_WAIT=120
-          ELAPSED=0
-          while [[ "$(docker inspect --format='{{.State.Health.Status}}' $TMP_CONTAINER 2>/dev/null)" != "healthy" ]]; do
+          MAX_WAIT=120; ELAPSED=0
+          until [ "$ELAPSED" -ge "$MAX_WAIT" ] || \
+                [ "$(docker inspect --format='{{.State.Health.Status}}' $TMP_CONTAINER 2>/dev/null)" = "healthy" ]; do
             sleep 5
             ELAPSED=$((ELAPSED + 5))
-            if [[ "$ELAPSED" -ge "$MAX_WAIT" ]]; then
-              echo "[ERROR] $TMP_CONTAINER did not become healthy in time."
-              docker logs $TMP_CONTAINER
-              exit 1
-            fi
           done
+
+          if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
+            echo "[ERROR] $TMP_CONTAINER did not become healthy in time."
+            docker logs $TMP_CONTAINER
+            exit 1
+          fi
 
       - name: Run live container with Traefik labels
         run: |
@@ -98,24 +101,25 @@ jobs:
       - name: Wait for live container to become healthy
         run: |
           echo "[INFO] Waiting for production container $CONTAINER_NAME to become healthy..."
-          MAX_WAIT=120
-          ELAPSED=0
-          while [[ "$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null)" != "healthy" ]]; do
+          MAX_WAIT=120; ELAPSED=0
+          until [ "$ELAPSED" -ge "$MAX_WAIT" ] || \
+                [ "$(docker inspect --format='{{.State.Health.Status}}' $CONTAINER_NAME 2>/dev/null)" = "healthy" ]; do
             sleep 5
             ELAPSED=$((ELAPSED + 5))
-            if [[ "$ELAPSED" -ge "$MAX_WAIT" ]]; then
-              echo "[ERROR] $CONTAINER_NAME did not become healthy in time."
-              docker logs $CONTAINER_NAME
-              exit 1
-            fi
           done
+
+          if [ "$ELAPSED" -ge "$MAX_WAIT" ]; then
+            echo "[ERROR] $CONTAINER_NAME did not become healthy in time."
+            docker logs $CONTAINER_NAME
+            exit 1
+          fi
 
       - name: Cleanup old containers (excluding new one)
         run: |
-          echo "[INFO] Cleaning up old silence-* containers (excluding ${{ env.CONTAINER_NAME }} and ${{ env.TMP_CONTAINER }})..."
-          docker ps -a --filter "name=silence-" --format "{{.Names}}" \
-            | grep -v "${{ env.CONTAINER_NAME }}" \
-            | grep -v "${{ env.TMP_CONTAINER }}" \
+          echo "[INFO] Cleaning up old silence-* containers..."
+          docker ps -a --filter "name=silence-" --format '{{.Names}}' \
+            | grep -v "^${CONTAINER_NAME}$" \
+            | grep -v "^${TMP_CONTAINER}$" \
             | xargs -r docker rm -f
 
       - name: Remove temp container
