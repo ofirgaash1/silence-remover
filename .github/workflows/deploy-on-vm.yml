@@ -11,9 +11,10 @@ jobs:
     runs-on: [azure]
 
     env:
-      CONTAINER_NAME: silence-${{ github.event.client_payload.tag }}
-      TMP_CONTAINER: silence-${{ github.event.client_payload.tag }}-tmp
-      IMAGE_TAG: ${{ github.event.client_payload.tag }}
+      # fall back to "latest" when client_payload.tag is null/empty
+      IMAGE_TAG: ${{ default(github.event.client_payload.tag, 'latest') }}
+      CONTAINER_NAME: silence-${{ default(github.event.client_payload.tag, 'latest') }}
+      TMP_CONTAINER: silence-${{ default(github.event.client_payload.tag, 'latest') }}-tmp
 
     steps:
 
@@ -45,6 +46,7 @@ jobs:
             echo "[INFO] Traefik container already exists. Ensuring it's running..."
             docker start traefik || true
           fi
+
       - name: Ensure Traefik is running
         run: |
           if ! docker ps --format '{{.Names}}' | grep -q "^traefik$"; then
@@ -53,7 +55,6 @@ jobs:
           else
             echo "[INFO] Traefik already running."
           fi
-
 
       - name: Pull image from Docker Hub
         run: docker pull ofirgaash/silence-remover:${{ env.IMAGE_TAG }}
