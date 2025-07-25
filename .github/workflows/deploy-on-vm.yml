@@ -55,7 +55,7 @@ jobs:
             docker start traefik || true
           else
             echo "[INFO] Starting Traefik with Compose..."
-            docker compose -f traefik/docker-compose.traefik.yml up -d traefik
+            docker compose -f traefik/docker-compose.yml up -d traefik
           fi
 
       - name: Pull image from Docker Hub
