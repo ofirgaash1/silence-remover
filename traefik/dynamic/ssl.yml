@@ -1,0 +1,5 @@
+# traefik/dynamic/ssl.yml
+tls:
+  certificates:
+    - certFile: /etc/letsencrypt/live/{{ your_domain }}/fullchain.pem
+      keyFile:  /etc/letsencrypt/live/{{ your_domain }}/privkey.pem
