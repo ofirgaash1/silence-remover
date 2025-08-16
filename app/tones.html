@@ -354,7 +354,7 @@
         <div class="row">
           <label for="freqSlider">Fundamental (Hz)</label>
           <input id="freqSlider" type="range" min="0" max="1" step="0.0001" />
-          <input id="freqNum" type="number" min="20" max="20000" step="1" value="1000" />
+          <input id="freqNum" type="number" min="20" max="20000" step="1" value="80" />
         </div>
         <div class="row">
           <label for="bSlider">Inharmonicity (B)</label>
@@ -363,7 +363,7 @@
         </div>
         <div class="row">
           <label for="master">Master (Sum Amp %)</label>
-          <input id="master" type="range" min="0" max="100" step="0.01" value="100" />
+          <input id="master" type="range" min="0" max="100" step="0.01" value="40" />
           <div class="out" id="masterOut">100.00% (Sum Amp)</div>
         </div>
       </div>
@@ -1204,8 +1204,12 @@
       updateGroupsToggleAllLabel();
     }
 
-
+    let aaa = "hi"
     toggleBtn.addEventListener('click', async function () {
+      if (aaa == "hi") {
+        applyPreset("saw")
+        aaa = "bye"
+      }
       await ensureContext();
       if (currentEngine) { stopEngine(); }
       else { startEngine(); }
