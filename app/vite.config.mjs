@@ -7,7 +7,8 @@ export default {
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html', 'tones.html')
+        main: resolve(__dirname, 'index.html')
+        tones: resolve(__dirname, 'tones.html') 
       }
     }
   },
