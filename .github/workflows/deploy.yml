@@ -31,8 +31,12 @@ jobs:
         run: docker compose -f docker-compose.prod.yml build --no-cache
 
       - name: Deploy
-        run: docker compose -f docker-compose.prod.yml up -d --force-recreate web
+        run: docker compose -f docker-compose.prod.yml up -d --force-recreate web certbot
 
       - name: Set restart policy (optional)
         run: |
           docker update --restart unless-stopped silence-remover || true
+          docker update --restart unless-stopped certbot || true
+
+      - name: Install renewal cron
+        run: bash ./install-renew-cron.sh
