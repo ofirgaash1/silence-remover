@@ -1204,12 +1204,9 @@
       updateGroupsToggleAllLabel();
     }
 
-    let aaa = "hi"
+
     toggleBtn.addEventListener('click', async function () {
-      if (aaa == "hi") {
-        applyPreset("saw")
-        aaa = "bye"
-      }
+      applyPreset("saw")
       await ensureContext();
       if (currentEngine) { stopEngine(); }
       else { startEngine(); }
