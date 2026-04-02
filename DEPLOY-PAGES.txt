@@ -1,0 +1,39 @@
+# PowerShell (copy-paste from repo root: C:\Users\ofirg\silence\silence-remover)
+$ErrorActionPreference = "Stop"
+
+$Repo = "ofirgaash1/silence-remover"
+$Branch = "com"
+$PagesUrl = "https://ofirgaash1.github.io/silence-remover/"
+
+git checkout $Branch
+git pull origin $Branch
+
+# Optional local verification build
+npm ci --prefix app
+npm run build --prefix app
+
+# Push latest branch content (required for Actions deploy)
+git push origin $Branch
+
+# Ensure GitHub Pages is enabled for GitHub Actions workflow deploys
+try {
+  gh api --method POST "repos/$Repo/pages" -f build_type=workflow | Out-Null
+} catch {
+  Write-Host "Pages may already be enabled; continuing..."
+}
+
+# Ensure branch is allowed to deploy to the github-pages environment
+try {
+  gh api --method POST "repos/$Repo/environments/github-pages/deployment-branch-policies" -f name=$Branch -f type=branch | Out-Null
+} catch {
+  Write-Host "Branch policy may already exist; continuing..."
+}
+
+# Trigger deploy workflow and show latest run
+gh workflow run "Deploy GitHub Pages" --ref $Branch
+Start-Sleep -Seconds 3
+gh run list --repo $Repo --workflow "Deploy GitHub Pages" --limit 1
+
+# Open/verify site
+Start-Process $PagesUrl
+curl.exe -I $PagesUrl

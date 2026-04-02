@@ -1,4 +1,15 @@
-# Production Runbook
+# Silence Remover
+
+Live site: [https://ofirgaash1.github.io/silence-remover/](https://ofirgaash1.github.io/silence-remover/)
+
+![Silence Remover](./image.png)
+
+## Purpose
+
+Silence Remover is a browser-based editor for trimming silent sections from audio and video files.
+It is designed to be fast and simple: upload a file, detect or adjust silence regions, and export a shorter result as MP3 or MP4.
+
+## Production Runbook
 
 ## Deployment path
 
