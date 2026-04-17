@@ -5,12 +5,18 @@ const { spawn } = require("child_process");
 const wavEncoder = require("wav-encoder");
 
 function getFFmpegPath() {
-  if (process.env.NODE_ENV === "development" || !app.isPackaged) {
-    return path.join(__dirname, "bin", "ffmpeg.exe");
-  } else {
-    // In production, Electron puts extraResources next to the executable
-    return path.join(process.resourcesPath, "ffmpeg.exe");
+  const ffmpegBinary = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
+  const ffmpegBaseDir =
+    process.env.NODE_ENV === "development" || !app.isPackaged
+      ? path.join(__dirname, "bin")
+      : path.join(process.resourcesPath, "bin");
+  const ffmpegPath = path.join(ffmpegBaseDir, ffmpegBinary);
+
+  if (!fs.existsSync(ffmpegPath)) {
+    throw new Error(`FFmpeg binary not found: ${ffmpegPath}`);
   }
+
+  return ffmpegPath;
 }
 
 

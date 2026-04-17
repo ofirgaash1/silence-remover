@@ -1,0 +1,113 @@
+name: Desktop Installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }} Installer
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            build_script: dist:win
+          - os: macos-latest
+            platform: macos
+            build_script: dist:mac
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: |
+            app/package-lock.json
+            silence-cutter-desktop/package-lock.json
+
+      - name: Install and build web app
+        working-directory: app
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install desktop dependencies
+        working-directory: silence-cutter-desktop
+        run: npm ci
+
+      - name: Prepare FFmpeg (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "silence-cutter-desktop/bin" | Out-Null
+          choco install ffmpeg -y --no-progress
+          $ffmpegPath = Get-ChildItem -Path "C:\ProgramData\chocolatey\lib\ffmpeg\tools" -Filter "ffmpeg.exe" -Recurse |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $ffmpegPath) {
+            throw "Unable to locate a real ffmpeg.exe binary after Chocolatey install."
+          }
+          Copy-Item -LiteralPath $ffmpegPath -Destination "silence-cutter-desktop/bin/ffmpeg.exe" -Force
+
+      - name: Prepare FFmpeg (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p silence-cutter-desktop/bin
+          brew install ffmpeg
+          cp "$(command -v ffmpeg)" silence-cutter-desktop/bin/ffmpeg
+          chmod +x silence-cutter-desktop/bin/ffmpeg
+
+      - name: Build installer
+        working-directory: silence-cutter-desktop
+        run: npm run ${{ matrix.build_script }}
+
+      - name: Upload Windows installer artifact
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-windows
+          path: |
+            silence-cutter-desktop/dist/*.exe
+            silence-cutter-desktop/dist/*.exe.blockmap
+            silence-cutter-desktop/dist/latest*.yml
+          if-no-files-found: error
+
+      - name: Upload macOS installer artifact
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-macos
+          path: |
+            silence-cutter-desktop/dist/*.dmg
+            silence-cutter-desktop/dist/*.zip
+            silence-cutter-desktop/dist/*.blockmap
+            silence-cutter-desktop/dist/latest*.yml
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create release and upload assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/*
