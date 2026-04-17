@@ -1,4 +1,6 @@
-# PowerShell (copy-paste from repo root: C:\Users\ofirg\silence\silence-remover)
+# PowerShell manual GitHub Pages preview deploy
+# Production is silence-remover.com via .github/workflows/deploy.yml.
+# This script is only for the GitHub Pages preview at ofirgaash1.github.io/silence-remover/.
 $ErrorActionPreference = "Stop"
 
 $Repo = "ofirgaash1/silence-remover"
@@ -12,7 +14,7 @@ git pull origin $Branch
 npm ci --prefix app
 npm run build --prefix app
 
-# Push latest branch content (required for Actions deploy)
+# Push latest branch content so the manual workflow can deploy the current branch state
 git push origin $Branch
 
 # Ensure GitHub Pages is enabled for GitHub Actions workflow deploys

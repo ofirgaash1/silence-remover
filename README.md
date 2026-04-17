@@ -1,6 +1,8 @@
 # Silence Remover
 
-Live site: [https://ofirgaash1.github.io/silence-remover/](https://ofirgaash1.github.io/silence-remover/)
+Production site: [https://silence-remover.com](https://silence-remover.com)
+
+GitHub Pages preview: [https://ofirgaash1.github.io/silence-remover/](https://ofirgaash1.github.io/silence-remover/)
 
 ![Silence Remover](./image.png)
 
@@ -16,12 +18,19 @@ It is designed to be fast and simple: upload a file, detect or adjust silence re
 - Production deploys run through GitHub Actions on the self-hosted `ec2` runner.
 - The source of truth is `.github/workflows/deploy.yml`.
 - The production stack is defined in `docker-compose.prod.yml`.
+- GitHub Pages is a manual preview path only and is not the production deployment target.
 
 ## Normal deploy
 
 - Push to the `com` branch, or run the workflow manually from GitHub Actions.
 - The workflow builds the image, recreates `web` and `certbot`, sets restart policies, and reinstalls the renewal cron job.
 - `web` and `certbot` must both be running. Deploying only `web` can leave certificate renewal broken.
+
+## GitHub Pages preview
+
+- GitHub Pages previews are manual-only and use `.github/workflows/deploy-pages.yml`.
+- Use Pages only when you want a static preview build at `ofirgaash1.github.io/silence-remover/`.
+- Do not treat the Pages deployment as production.
 
 ## SSL layout
 
