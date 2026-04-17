@@ -89,7 +89,6 @@ jobs:
           name: installer-macos
           path: |
             silence-cutter-desktop/dist/*.dmg
-            silence-cutter-desktop/dist/*.zip
             silence-cutter-desktop/dist/latest*.yml
           if-no-files-found: error
 

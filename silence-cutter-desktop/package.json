@@ -9,7 +9,7 @@
     "start": "electron .",
     "dist": "npm run dist:win",
     "dist:win": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis",
-    "dist:mac": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip",
+    "dist:mac": "cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg",
     "dist:release": "electron-builder --win"
   },
   "devDependencies": {
@@ -54,8 +54,7 @@
     },
     "mac": {
       "target": [
-        "dmg",
-        "zip"
+        "dmg"
       ]
     }
   }
