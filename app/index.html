@@ -4,187 +4,330 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <title>Silence Remover – Remove Silent Parts from Audio & Video (MP3, MP4)</title>
-
-
-  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
-  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png">
-  <link rel="manifest" href="./site.webmanifest">
-
-
-  <!-- SEO Meta Tags -->
-  <link rel="canonical" href="https://silence-remover.com/">
+  <title>Silence Remover for MP3 & MP4 | Remove Silence From Audio & Video Online</title>
   <meta name="description"
-    content="A fast, free, and simple online tool to remove silent parts from MP4 videos and MP3 audio. Works directly in your browser." />
-  <meta name="keywords"
-    content="silence remover, silence cutter, video editor, audio editor, mp4, mp3, remove silence, online tool" />
+    content="Free online silence remover for MP3 and MP4 files. Remove silent parts from audio and video in your browser, tune the silence threshold, preview the waveform, and export cleaned files fast." />
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
   <meta name="author" content="Ofir Gaash" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="canonical" href="https://silence-remover.com/" />
+
+  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="./favicon-16x16.png" />
+  <link rel="manifest" href="./site.webmanifest" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://silence-remover.com/" />
+  <meta property="og:title" content="Silence Remover for MP3 & MP4" />
+  <meta property="og:description"
+    content="Remove silence from audio and video online. Upload a file, preview the waveform, adjust the threshold, and export MP3 or MP4 without leaving your browser." />
+  <meta property="og:image" content="https://silence-remover.com/og-image.png" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Silence Remover for MP3 & MP4" />
+  <meta name="twitter:description"
+    content="Remove silence from MP3 and MP4 files online with a browser-based silence remover." />
+  <meta name="twitter:image" content="https://silence-remover.com/og-image.png" />
 
   <script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "Audio & Video Silence Remover",
-  "description": "Remove silent parts from videos and audio (MP4, MP3) instantly, in your browser.",
-  "applicationCategory": "MultimediaApplication",
-  "operatingSystem": "All",
-  "browserRequirements": "Requires JavaScript",
-  "url": "https://silence-remover.com/",
-  "offers": {
-    "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "USD"
-  }
-}
-</script>
-  <!-- Social / Open Graph -->
-  <meta property="og:title" content="Audio & Video Silence Remover" />
-  <meta property="og:description"
-    content="Instantly cut silence from your audio or video files — right in your browser." />
-  <meta property="og:image" content="https://i.ibb.co/b5wymxXt/Whats-App-Image-2025-05-21-at-06-24-13-8585dade.jpg" />
-  <meta property="og:url" content="https://silence-remover.com/" />
-  <meta property="og:type" content="website" />
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://silence-remover.com/#website",
+          "url": "https://silence-remover.com/",
+          "name": "Silence Remover",
+          "description": "Browser-based silence remover for MP3 and MP4 files."
+        },
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://silence-remover.com/#app",
+          "name": "Silence Remover",
+          "applicationCategory": "MultimediaApplication",
+          "applicationSubCategory": "Audio and Video Editing",
+          "operatingSystem": "Any",
+          "browserRequirements": "Requires JavaScript",
+          "url": "https://silence-remover.com/",
+          "image": "https://silence-remover.com/og-image.png",
+          "description": "Free online silence remover for cutting silent parts from MP3 audio and MP4 video directly in the browser.",
+          "featureList": [
+            "Remove silence from audio and video",
+            "Export cleaned MP3 files",
+            "Export cleaned MP4 files",
+            "Preview waveform before export",
+            "Download timeline-ready ZIP segments"
+          ],
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://silence-remover.com/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How do I remove silence from an MP3 file?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Upload the MP3 file, adjust the amplitude threshold and silence shrink controls, review the highlighted silent regions, and export a cleaned MP3."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Can I remove silence from MP4 video online?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. The app supports MP4 and other video uploads, shows the waveform, and can export a trimmed MP4 after silent sections are removed."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Does Silence Remover upload my files to a server?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "The web app is designed to process files in the browser, which is useful when you want a quick local workflow for editing silence without a server-side account."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "What is the difference between Export MP4 and Download All Segments ZIP?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Export MP4 creates one merged video without the silent parts. Download All Segments ZIP exports each timeline segment separately in order, which can help in downstream editing workflows."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  </script>
 
-  <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Audio & Video Silence Remover" />
-  <meta name="twitter:description"
-    content="Instantly cut silence from your audio or video files — right in your browser." />
-  <meta name="twitter:image" content="https://i.ibb.co/b5wymxXt/Whats-App-Image-2025-05-21-at-06-24-13-8585dade.jpg" />
-
-  <!-- CSS -->
   <link rel="stylesheet" href="./src/style.css" />
 </head>
 
-
 <body>
-  <button id="themeToggle" class="theme-toggle" aria-label="Toggle dark mode">
+  <button id="themeToggle" class="theme-toggle" aria-label="Enable dark mode">
     <span id="themeIcon" aria-hidden="true">🌙</span>
   </button>
+
   <form action="https://www.paypal.com/donate" method="post" target="_top" class="donate-form">
     <input type="hidden" name="hosted_button_id" value="MRJF9A83YR2BE" />
     <input type="image" alt="Donate with PayPal" src="https://www.paypalobjects.com/en_US/IL/i/btn/btn_donateCC_LG.gif"
-      border="0" name="submit" title="PayPal - The safer, easier way to pay online!" alt="Donate with PayPal button" />
+      border="0" name="submit" title="PayPal - The safer, easier way to pay online!" />
   </form>
 
-  <h1 id="title">Audio & Video Silence Remover</h1>
+  <header class="site-header">
+    <div class="hero-copy">
+      <h1 id="title">Silence Remover for Audio & Video</h1>
+    </div>
+  </header>
 
-  <!-- Drag & Drop or Browse Area -->
   <div id="drop-zone" class="drop-zone">
     <div id="drop-zone-text">
       <p>
-        Drag & drop an audio or video file here<br />or
-        <button id="browseBtn">Choose File</button>
+        Drag and drop an audio or video file here<br />or
+        <button id="browseBtn" type="button">Choose File</button>
       </p>
       <input type="file" id="audioFile" accept="audio/*,video/*,.mov" style="display: none" />
     </div>
   </div>
 
-  <!-- Waveform Container -->
   <div id="waveformContainer" style="position: relative">
     <div id="waveform" class="waveform" style="display: none"></div>
     <div id="thresholdLine"></div>
   </div>
 
-  <!-- <button id="Fullscreen">⛶ Fullscreen</button> -->
-  <!-- Sliders and Controls -->
-  <main  class="main-layout">
-    <section id="videoPreview2container">
-      <video id="videoPreview2" muted></video>
-    </section>
+  <main class="main-layout">
+    <div class="preview-column">
+      <section id="videoPreview2container" aria-label="Video preview">
+        <video id="videoPreview2" muted></video>
+      </section>
 
-    <div class="controls">
+      <div class="video-timestamp">
+        <span id="currentTime">0:00</span> / <span id="duration">0:00</span>
+      </div>
+    </div>
 
-      <div class="control-group">
-        <label for="zoomSlider" class="slider-label">Zoom:</label>
-        <div class="slider-row">
-          <input type="range" id="zoomSlider" name="zoomSlider" min="0" max="8" value="0" step="0.08" />
-          <div class="input-wrap">
+    <div class="controls-column">
+      <section class="controls" aria-label="Silence removal controls">
+        <div class="control-group">
+          <label for="zoomSlider" class="slider-label">Zoom</label>
+          <div class="slider-row">
+            <input type="range" id="zoomSlider" name="zoomSlider" min="0" max="8" value="0" step="0.08" />
             <div class="input-wrap">
-              <input type="number" id="zoomInput" step="0.01" />
+              <div class="input-wrap">
+                <input type="number" id="zoomInput" step="0.01" />
+                <span>%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label for="thresholdSlider" class="slider-label">Amplitude Threshold</label>
+          <div class="slider-row">
+            <input type="range" id="thresholdSlider" name="thresholdSlider" min="0" max="100" step="0.01" />
+            <div class="input-wrap">
+              <input type="number" id="thresholdInput" step="0.01" />
               <span>%</span>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="control-group">
-        <label for="thresholdSlider" class="slider-label">Amplitude Threshold:</label>
-        <div class="slider-row">
-          <input type="range" id="thresholdSlider" name="thresholdSlider" min="0" max="100" step="0.01" />
-          <div class="input-wrap">
-            <input type="number" id="thresholdInput" step="0.01" />
-            <span>%</span>
+        <div class="control-group">
+          <label for="shrinkSlider" class="slider-label">Shrink Silence</label>
+          <div class="slider-row">
+            <input type="range" id="shrinkSlider" name="shrinkSlider" min="0" value="0" max="1000" step="1" />
+            <div class="input-wrap">
+              <input type="number" id="shrinkInput" step="1" />
+              <span>ms</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="control-group">
-        <label for="shrinkSlider" class="slider-label">Shrink Silence:</label>
-        <div class="slider-row">
-          <input type="range" id="shrinkSlider" name="shrinkSlider" min="0" value="0" max="1000" step="1" />
-          <div class="input-wrap">
-            <input type="number" id="shrinkInput" step="1" />
-            <span>ms</span>
-          </div>
+        <div class="button-row">
+          <button id="cutAudio" type="button">Export MP3</button>
+          <button id="cutVideoBtn" type="button">Export MP4</button>
+          <button id="downloadSegmentsZipBtn" type="button">Download All Segments ZIP</button>
+          <button id="invert" type="button">Invert Selection</button>
         </div>
-      </div>
-
-      <!-- <div class="format-controls">
-        <label>Audio Output Format:</label>
-        <button class="fmt-btn selected" data-format="mp3">MP3 ✓</button>
-        <button class="fmt-btn" data-format="wav">WAV</button>
-      </div> -->
-
-      <div class="button-row">
-        <button id="cutAudio">Export MP3</button>
-        <button id="cutVideoBtn">Export MP4</button>
-        <button id="invert">Invert Selection</button>
+      </section>
+      <div id="statsPanel">
+        Time saved: 0s - 0% shorter - 0 silence regions
       </div>
     </div>
+  </main>
 
-  </main >
-  
-  <div class="video-timestamp">
-    <span id="currentTime">0:00</span> / <span id="duration">0:00</span>
-  </div>
-  <!-- under your controls, before the footer -->
   <div class="bottom-row">
     <section class="keyboard-shortcuts">
       <h2>Keyboard Shortcuts</h2>
       <ul>
-        <li><span class="key"><kbd>Space Bar</kbd></span><span class="description">▶ Play ⏸ Pause</span></li>
+        <li><span class="key"><kbd>Space</kbd></span><span class="description">▶ Play ⏸ Pause</span></li>
         <li><span class="key"><kbd>F</kbd></span><span class="description">⛶ Fullscreen</span></li>
         <li><span class="key"><kbd>S</kbd></span><span class="description">⏪ Jump to start</span></li>
-        <li><span class="key"><kbd>&larr; LEFT</kbd></span><span class="description">Rewind 10 sec</span></li>
-        <li><span class="key"><kbd>RIGHT &rarr;</kbd></span><span class="description">Forward 10 sec</span></li>
+        <li><span class="key"><kbd>Left</kbd></span><span class="description">⏮ Rewind 10 seconds</span></li>
+        <li><span class="key"><kbd>Right</kbd></span><span class="description">⏭ Forward 10 seconds</span></li>
       </ul>
     </section>
-
-    <div id="statsPanel">
-      Time saved: 0s – 0% shorter – 0 silence regions
-    </div>
   </div>
 
-
-
   <audio id="audioPreview" controls></audio>
-  <br />
-  <button id="AudioDownloadBtn" class="download-btn">Download Audio</button>
+  <button id="AudioDownloadBtn" class="download-btn" type="button">Download MP3</button>
 
-  <!-- Video Preview -->
-  <br />
-  <button id="downloadVideoBtn" class="download-btn">Download Video</button>
+  <button id="downloadVideoBtn" class="download-btn" type="button">Download MP4</button>
 
-  <!-- Processing Indicator -->
   <footer class="bug-report">
-    Found a bug?
+    Found a bug? Have a good idea?
     <a href="mailto:ofir.gaash@gmail.com">ofir.gaash@gmail.com</a>
   </footer>
 
-  <!-- Script dependencies -->
+  <section id="how-it-works" class="content-section">
+    <p class="supporting-copy">
+      Remove silence from <a href="./remove-silence-from-audio.html">audio</a> and <a
+        href="./remove-silence-from-video.html">video</a> online. Upload a file, inspect the waveform, tune the
+      silence threshold, and export a tighter result directly in your browser.
+    </p>
+    <nav class="seo-nav" aria-label="Page sections">
+      <a href="#how-it-works">How it works</a>
+      <a href="#use-cases">Use cases</a>
+      <a href="#faq">FAQ</a>
+      <a href="./remove-silence-from-audio.html">Audio page</a>
+      <a href="./remove-silence-from-video.html">Video page</a>
+      <a href="./mp3-silence-remover.html">MP3 page</a>
+      <a href="./mp4-silence-remover.html">MP4 page</a>
+    </nav>
+    <ul class="value-points" aria-label="Product highlights">
+      <li>Free browser-based silence remover</li>
+      <li>Supports both audio and video workflows</li>
+      <li>Exports MP3, MP4, and segment ZIP files</li>
+    </ul>
+    <div class="content-grid">
+      <article class="content-card">
+        <h2>How the silence remover works</h2>
+        <ol class="plain-list">
+          <li>Upload an MP3, MP4, or another supported audio or video file.</li>
+          <li>Use the amplitude threshold to decide what counts as silence.</li>
+          <li>Shrink or remove the highlighted silent regions.</li>
+          <li>Export a cleaned MP3, a cleaned MP4, or timeline-ready ZIP segments.</li>
+        </ol>
+      </article>
+      <article class="content-card">
+        <h2>What you can do here</h2>
+        <p>
+          Use Silence Remover as an <a href="./remove-silence-from-audio.html">audio silence remover</a>, a <a
+            href="./remove-silence-from-video.html">video silence remover</a>, an <a
+            href="./mp3-silence-remover.html">MP3 silence remover</a>, or an <a
+            href="./mp4-silence-remover.html">MP4 silence remover</a> before publishing, sharing, or bringing the
+          files into a longer edit.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section id="use-cases" class="content-section">
+    <div class="content-grid">
+      <article class="content-card">
+        <h2>Audio silence remover</h2>
+        <p>
+          If your need is broader than MP3, use the audio workflow for podcasts, voiceovers, interviews, meetings, and
+          lecture recordings.
+        </p>
+        <a class="text-link" href="./remove-silence-from-audio.html">Read the audio guide</a>
+      </article>
+      <article class="content-card">
+        <h2>MP3 silence remover</h2>
+        <p>
+          Use the MP3 workflow to remove silence from podcasts, voiceovers, meetings, interviews, and lecture audio.
+          After review, export a tighter MP3 for publishing or review.
+        </p>
+        <a class="text-link" href="./mp3-silence-remover.html">Read the MP3-specific guide</a>
+      </article>
+      <article class="content-card">
+        <h2>Video silence remover</h2>
+        <p>
+          If your need is broader than MP4, use the video workflow for tutorials, talking-head recordings, demos,
+          webinars, and recorded calls.
+        </p>
+        <a class="text-link" href="./remove-silence-from-video.html">Read the video guide</a>
+      </article>
+      <article class="content-card">
+        <h2>MP4 silence remover</h2>
+        <p>
+          Use the MP4 workflow to cut dead air from tutorials, talking-head videos, product demos, and recorded calls.
+          You can export one merged MP4 or download timeline-ordered segments.
+        </p>
+        <a class="text-link" href="./mp4-silence-remover.html">Read the MP4-specific guide</a>
+      </article>
+    </div>
+  </section>
+
+  <section id="faq" class="content-section faq-section">
+    <div class="content-card faq-card">
+      <h2>Frequently Asked Questions</h2>
+      <div class="faq-item">
+        <h3>Can I remove silence from audio without installing desktop software?</h3>
+        <p>Yes. The web app handles common silence removal tasks directly in the browser.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Can I remove silence from video and keep an MP4 output?</h3>
+        <p>Yes. Upload a video file, review the silent sections, and export a merged MP4 when you are satisfied.</p>
+      </div>
+      <div class="faq-item">
+        <h3>What should I do if the tool marks too much audio as silence?</h3>
+        <p>Lower the amplitude threshold or reduce the shrink amount until the highlighted regions match your intent.</p>
+      </div>
+      <div class="faq-item">
+        <h3>Why provide ZIP segments as well as a merged export?</h3>
+        <p>The ZIP option is useful when you want the kept sections in sequence for other editing workflows.</p>
+      </div>
+    </div>
+  </section>
+
   <script src="https://unpkg.com/lamejs@1.2.0/lame.min.js"></script>
   <script src="https://unpkg.com/wavesurfer.js@6/dist/wavesurfer.min.js"></script>
   <script src="https://unpkg.com/wavesurfer.js@6/dist/plugin/wavesurfer.regions.min.js"></script>
@@ -196,21 +339,15 @@
     const themeIcon = document.getElementById("themeIcon");
 
     function applyTheme(mode) {
-      if (mode === "dark") {
-        body.classList.add("dark-mode");
-        themeIcon.textContent = "☀️";
-      } else {
-        body.classList.remove("dark-mode");
-        themeIcon.textContent = "🌙";
-      }
+      const isDark = mode === "dark";
+      body.classList.toggle("dark-mode", isDark);
+      themeIcon.textContent = isDark ? "☀️" : "🌙";
+      toggleBtn.setAttribute("aria-label", isDark ? "Enable light mode" : "Enable dark mode");
       localStorage.setItem("theme", mode);
     }
 
-    // Detect preference
     const savedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia(
-      "(prefers-color-scheme: dark)"
-    ).matches;
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
     if (savedTheme) {
       applyTheme(savedTheme);
@@ -218,13 +355,11 @@
       applyTheme(prefersDark ? "dark" : "light");
     }
 
-    // Toggle handler
     toggleBtn.addEventListener("click", () => {
       const isDark = body.classList.contains("dark-mode");
       applyTheme(isDark ? "light" : "dark");
     });
   </script>
-
 </body>
 
 </html>
