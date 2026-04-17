@@ -1,6 +1,7 @@
 # Silence Remover
 
-Live site: [https://ofirgaash1.github.io/silence-remover/](https://ofirgaash1.github.io/silence-remover/)
+Live site: [https://silence-remover.com](https://silence-remover.com)
+Manual GitHub Pages preview: run `.github/workflows/deploy-pages.yml` from Actions when needed.
 
 ![Silence Remover](./image.png)
 
@@ -8,6 +9,27 @@ Live site: [https://ofirgaash1.github.io/silence-remover/](https://ofirgaash1.gi
 
 Silence Remover is a browser-based editor for trimming silent sections from audio and video files.
 It is designed to be fast and simple: upload a file, detect or adjust silence regions, and export a shorter result as MP3 or MP4.
+
+## Desktop Releases
+
+- Tagging `v*` triggers `.github/workflows/desktop-installers.yml` and publishes Windows and macOS installers.
+- macOS releases are expected to be signed with a `Developer ID Application` certificate and notarized with App Store Connect.
+- The workflow now fails if the required macOS signing or notarization secrets are missing, or if the built `.app` / `.dmg` fails validation.
+- Use `npm run dist:mac:unsigned --prefix silence-cutter-desktop` only for local test builds. Do not ship that DMG to users.
+
+## macOS Release Secrets
+
+- `CSC_LINK`: base64-encoded exported `Developer ID Application` `.p12` certificate.
+- `CSC_KEY_PASSWORD`: password for that `.p12`.
+- `APPLE_API_KEY_P8`: contents of the App Store Connect API key file.
+- `APPLE_API_KEY_ID`: the App Store Connect key ID.
+- `APPLE_API_ISSUER`: the App Store Connect issuer UUID.
+
+PowerShell example for `CSC_LINK` from a local `.p12`:
+
+```powershell
+[Convert]::ToBase64String([IO.File]::ReadAllBytes("C:\path\DeveloperIDApplication.p12"))
+```
 
 ## Production Runbook
 
