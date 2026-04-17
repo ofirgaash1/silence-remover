@@ -46,7 +46,6 @@ const downloadBtn = document.getElementById("AudioDownloadBtn");
 const cutVideoBtn = document.getElementById("cutVideoBtn");
 const downloadVideoBtn = document.getElementById("downloadVideoBtn");
 const downloadSegmentsZipBtn = document.getElementById("downloadSegmentsZipBtn");
-const exportBothBtn = document.getElementById("exportBothBtn");
 const statsPanel = document.getElementById("statsPanel");
 const zoomSlider = document.getElementById("zoomSlider");
 const zoomInput = document.getElementById("zoomInput");
@@ -68,12 +67,10 @@ const EXPORT_JOB_STATE = {
   IDLE: "idle",
   MP4: "mp4",
   ZIP: "zip",
-  BOTH: "both",
 };
 const EXPORT_BUTTON_TEXT = {
   MP4: "Export MP4",
   ZIP: "Download All Segments ZIP",
-  BOTH: "Export Both",
 };
 
 let wave = null;
@@ -198,7 +195,6 @@ function setupUIEvents() {
 
   cutVideoBtn.addEventListener("click", cutVideo);
   downloadSegmentsZipBtn.addEventListener("click", downloadAllSegmentsZip);
-  exportBothBtn.addEventListener("click", exportBoth);
 
   fileInput.addEventListener("change", (e) => {
     if (window.ElectronAPI) {
@@ -552,13 +548,6 @@ function refreshExportButtonsUI() {
         : EXPORT_BUTTON_TEXT.ZIP;
   }
 
-  if (exportBothBtn) {
-    exportBothBtn.disabled = !canStartExport;
-    exportBothBtn.innerText =
-      currentExportJob === EXPORT_JOB_STATE.BOTH
-        ? "Exporting Both..."
-        : EXPORT_BUTTON_TEXT.BOTH;
-  }
 }
 
 function recomputeOrderedTimelineSegments() {
@@ -1833,16 +1822,6 @@ async function cutVideo() {
       return;
     }
     title.innerText = "✅ MP4 is ready. You can also export the timeline ZIP.";
-  });
-}
-
-async function exportBoth() {
-  await runExportAction(EXPORT_JOB_STATE.BOTH, async (uploadedFile, segments) => {
-    const mp4Created = await exportMergedMp4(uploadedFile, segments, "both_mp4");
-    await exportSegmentsZip(uploadedFile, segments, "both_zip");
-    title.innerText = mp4Created
-      ? "✅ MP4 and ZIP are ready."
-      : "✅ ZIP is ready. MP4 was skipped (no non-silent regions).";
   });
 }
 
