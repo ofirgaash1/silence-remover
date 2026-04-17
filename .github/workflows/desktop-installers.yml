@@ -79,7 +79,6 @@ jobs:
           name: installer-windows
           path: |
             silence-cutter-desktop/dist/*.exe
-            silence-cutter-desktop/dist/*.exe.blockmap
             silence-cutter-desktop/dist/latest*.yml
           if-no-files-found: error
 
@@ -91,7 +90,6 @@ jobs:
           path: |
             silence-cutter-desktop/dist/*.dmg
             silence-cutter-desktop/dist/*.zip
-            silence-cutter-desktop/dist/*.blockmap
             silence-cutter-desktop/dist/latest*.yml
           if-no-files-found: error
 
