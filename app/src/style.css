@@ -84,6 +84,56 @@ h1 {
   background-color: #ecf7ff;
 }
 
+.large-file-warning {
+  max-width: 900px;
+  margin: 12px auto 0;
+  padding: 20px;
+  border: 1px solid #f3ca7b;
+  border-radius: 12px;
+  background: #fff8e8;
+  color: #6f4f1c;
+}
+
+.large-file-warning p {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.large-file-warning p:last-of-type {
+  margin-bottom: 0;
+}
+
+.large-file-warning-actions {
+  margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.large-file-warning-actions button {
+  min-width: 250px;
+  background: #6f4f1c;
+  color: #fff;
+  border-color: #6f4f1c;
+}
+
+.large-file-warning-actions button:hover {
+  background: #5a3f14;
+  border-color: #5a3f14;
+}
+
+body.dark-mode .large-file-warning-actions button {
+  background: #ffd37a;
+  color: #1e1e1e;
+  border-color: #ffd37a;
+}
+
+body.dark-mode .large-file-warning-actions button:hover {
+  background: #f0c264;
+  border-color: #f0c264;
+}
+
 /* Buttons */
 #browseBtn {
   font-family: inherit;
@@ -202,6 +252,13 @@ browseBtn:hover {
 
 .controls .control-group:last-child {
   margin-bottom: 0;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
 
 .control-group label {

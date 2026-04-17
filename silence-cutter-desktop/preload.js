@@ -17,6 +17,14 @@ contextBridge.exposeInMainWorld("ElectronAPI", {
   cutOneSegment: (uploadedFileRaw, segment) =>
     ipcRenderer.invoke("cut-one-segment", uploadedFileRaw, segment),
 
+  // Read and clean temp segment files (used for ZIP export)
+  readTempSegmentBuffer: (fileName) =>
+    ipcRenderer.invoke("read-temp-segment-buffer", fileName),
+  writeTempSegmentBuffer: (fileName, data) =>
+    ipcRenderer.invoke("write-temp-segment-buffer", fileName, data),
+  deleteTempSegment: (fileName) =>
+    ipcRenderer.invoke("delete-temp-segment", fileName),
+
   // Merge all segments into final output
   runMergeAndClean: (segmentFiles) =>
     ipcRenderer.invoke("run-merge-and-clean", segmentFiles),

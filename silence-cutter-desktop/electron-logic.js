@@ -38,6 +38,15 @@ function runNativeFFmpeg(args) {
   });
 }
 
+function resolveTempSegmentPath(fileName) {
+  if (!fileName || typeof fileName !== "string") {
+    throw new Error("Invalid temp file name.");
+  }
+
+  const safeName = path.basename(fileName);
+  return path.join(app.getPath("temp"), safeName);
+}
+
 // Handle file open
 ipcMain.handle("open-video-file", async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -154,6 +163,36 @@ ipcMain.handle("cut-one-segment", async (_, uploadedFileRaw, segment) => {
 
   await runNativeFFmpeg(args);
   console.log(`✅ Segment saved: ${outputName}`);
+});
+
+ipcMain.handle("read-temp-segment-buffer", async (_, fileName) => {
+  const tempSegmentPath = resolveTempSegmentPath(fileName);
+  if (!fs.existsSync(tempSegmentPath)) {
+    throw new Error(`Segment file not found: ${fileName}`);
+  }
+
+  const buffer = fs.readFileSync(tempSegmentPath);
+  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+});
+
+ipcMain.handle("write-temp-segment-buffer", async (_, fileName, data) => {
+  const tempSegmentPath = resolveTempSegmentPath(fileName);
+  const typed =
+    data instanceof Uint8Array
+      ? data
+      : ArrayBuffer.isView(data)
+      ? new Uint8Array(data.buffer, data.byteOffset, data.byteLength)
+      : new Uint8Array(data);
+  fs.writeFileSync(tempSegmentPath, Buffer.from(typed));
+  return true;
+});
+
+ipcMain.handle("delete-temp-segment", async (_, fileName) => {
+  const tempSegmentPath = resolveTempSegmentPath(fileName);
+  if (fs.existsSync(tempSegmentPath)) {
+    fs.unlinkSync(tempSegmentPath);
+  }
+  return true;
 });
 
 // Merge and clean

@@ -1,4 +1,5 @@
 import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/classes.js";
+import JSZip from "jszip";
 import "./style.css";
 window.FFmpegLib = {
   createFFmpeg: (options) => new FFmpeg(options),
@@ -44,6 +45,8 @@ const audioPreview = document.getElementById("audioPreview");
 const downloadBtn = document.getElementById("AudioDownloadBtn");
 const cutVideoBtn = document.getElementById("cutVideoBtn");
 const downloadVideoBtn = document.getElementById("downloadVideoBtn");
+const downloadSegmentsZipBtn = document.getElementById("downloadSegmentsZipBtn");
+const exportBothBtn = document.getElementById("exportBothBtn");
 const statsPanel = document.getElementById("statsPanel");
 const zoomSlider = document.getElementById("zoomSlider");
 const zoomInput = document.getElementById("zoomInput");
@@ -56,6 +59,22 @@ const videoElementContainer = document.getElementById("videoPreview2container");
 const sliders = document.querySelectorAll('input[type="range"]');
 const currentTimeSpan = document.getElementById('currentTime');
 const durationSpan = document.getElementById('duration');
+
+const LARGE_FILE_LIMIT_BYTES = 700 * 1024 * 1024;
+const EXE_DOWNLOAD_URL = "https://mega.nz/folder/PBtzhZqa#EcOfYukj90PzeAYlBa4LbA";
+const ZIP_FILE_NAME = "all_segments_premiere_ready.zip";
+const MIN_SEGMENT_DURATION_SEC = 0.01;
+const EXPORT_JOB_STATE = {
+  IDLE: "idle",
+  MP4: "mp4",
+  ZIP: "zip",
+  BOTH: "both",
+};
+const EXPORT_BUTTON_TEXT = {
+  MP4: "Export MP4",
+  ZIP: "Download All Segments ZIP",
+  BOTH: "Export Both",
+};
 
 let wave = null;
 let wavesurfer = null;
@@ -71,6 +90,9 @@ let textState = true;
 let bigVideo = false;
 let scrollTargetPx = null;
 let scrollLoopActive = false;
+let orderedTimelineSegments = [];
+let encodedSegmentCache = new Map();
+let currentExportJob = EXPORT_JOB_STATE.IDLE;
 let playState = {
   isPlaying: false,
   stopRequested: false,
@@ -86,6 +108,8 @@ function updateBackground() {
 }
 
 function setupUIEvents() {
+  refreshExportButtonsUI();
+
   sliders.forEach((slider) => {
     slider.addEventListener("input", updateBackground);
   });
@@ -173,6 +197,8 @@ function setupUIEvents() {
   });
 
   cutVideoBtn.addEventListener("click", cutVideo);
+  downloadSegmentsZipBtn.addEventListener("click", downloadAllSegmentsZip);
+  exportBothBtn.addEventListener("click", exportBoth);
 
   fileInput.addEventListener("change", (e) => {
     if (window.ElectronAPI) {
@@ -261,12 +287,16 @@ function resetUIState() {
 
   audioBuffer = null;
   silentRegions = [];
+  orderedTimelineSegments = [];
+  clearEncodedSegmentCache();
   lastBlob = null;
   audioPreview.src = "";
   //  videoPreview.src = "";
+  setCurrentExportJob(EXPORT_JOB_STATE.IDLE);
 
   dropZone.style.display = "none";
   waveformDiv.style.display = "block";
+  removeLargeFileWarning();
   updateThresholdLine();
 }
 
@@ -413,29 +443,143 @@ function enforceMinRegionDuration(regions, minDuration) {
   return merged;
 }
 
-function calculateNonSilentRanges() {
-  console.warn("inside calculateNonSilentRanges");
+function getCurrentMediaDuration() {
+  return (
+    (audioBuffer && audioBuffer.duration) ||
+    wavesurfer?.getDuration?.() ||
+    videoElement.duration ||
+    0
+  );
+}
 
-  const originalDuration =
-    (audioBuffer && audioBuffer.duration) || wavesurfer.getDuration() || 0;
-
-  let regions = [];
-  let lastEnd = 0;
-
-  title.innerText = "Getting ready...";
-
-  silentRegions.forEach((region) => {
-    if (region.start > lastEnd) {
-      regions.push({ start: lastEnd, end: region.start });
-    }
-    lastEnd = region.end;
-  });
-
-  if (lastEnd < originalDuration) {
-    regions.push({ start: lastEnd, end: originalDuration });
+function buildOrderedTimelineSegments() {
+  const totalDuration = getCurrentMediaDuration();
+  if (!totalDuration || !Number.isFinite(totalDuration)) {
+    return [];
   }
 
-  return regions;
+  const sortedSilentRegions = [...silentRegions].sort((a, b) => a.start - b.start);
+  const segments = [];
+  let cursor = 0;
+
+  for (const region of sortedSilentRegions) {
+    const start = Math.max(0, Math.min(region.start, totalDuration));
+    const end = Math.max(0, Math.min(region.end, totalDuration));
+    if (end <= start) continue;
+
+    if (start - cursor > MIN_SEGMENT_DURATION_SEC) {
+      segments.push({ start: cursor, end: start, type: "noisy" });
+    }
+
+    const normalizedSilentStart = Math.max(start, cursor);
+    if (end - normalizedSilentStart > MIN_SEGMENT_DURATION_SEC) {
+      segments.push({
+        start: normalizedSilentStart,
+        end,
+        type: "silent",
+      });
+    }
+
+    cursor = Math.max(cursor, end);
+  }
+
+  if (totalDuration - cursor > MIN_SEGMENT_DURATION_SEC) {
+    segments.push({ start: cursor, end: totalDuration, type: "noisy" });
+  }
+
+  if (!segments.length) {
+    return [];
+  }
+
+  return segments.map((segment, index) => {
+    const order = index + 1;
+    const baseName = `${order}_${segment.type}`;
+    return {
+      ...segment,
+      order,
+      baseName,
+      outputName: `${baseName}.mp4`,
+    };
+  });
+}
+
+function isExportRunning() {
+  return currentExportJob !== EXPORT_JOB_STATE.IDLE;
+}
+
+function clearEncodedSegmentCache() {
+  encodedSegmentCache.clear();
+}
+
+function segmentToCacheKey(segment) {
+  return `${segment.type}|${segment.start.toFixed(6)}|${segment.end.toFixed(6)}`;
+}
+
+function getCachedSegmentBuffer(segment) {
+  return encodedSegmentCache.get(segmentToCacheKey(segment)) || null;
+}
+
+function setCachedSegmentBuffer(segment, data) {
+  encodedSegmentCache.set(segmentToCacheKey(segment), new Uint8Array(data));
+}
+
+function pruneEncodedSegmentCache(validSegments) {
+  const validKeys = new Set(validSegments.map(segmentToCacheKey));
+  for (const cacheKey of encodedSegmentCache.keys()) {
+    if (!validKeys.has(cacheKey)) {
+      encodedSegmentCache.delete(cacheKey);
+    }
+  }
+}
+
+function refreshExportButtonsUI() {
+  const hasSegments = orderedTimelineSegments.length > 0;
+  const canStartExport = hasSegments && !isExportRunning();
+
+  if (cutVideoBtn) {
+    cutVideoBtn.disabled = !canStartExport;
+    cutVideoBtn.innerText =
+      currentExportJob === EXPORT_JOB_STATE.MP4
+        ? "Exporting MP4..."
+        : EXPORT_BUTTON_TEXT.MP4;
+  }
+
+  if (downloadSegmentsZipBtn) {
+    downloadSegmentsZipBtn.disabled = !canStartExport;
+    downloadSegmentsZipBtn.innerText =
+      currentExportJob === EXPORT_JOB_STATE.ZIP
+        ? "Preparing ZIP..."
+        : EXPORT_BUTTON_TEXT.ZIP;
+  }
+
+  if (exportBothBtn) {
+    exportBothBtn.disabled = !canStartExport;
+    exportBothBtn.innerText =
+      currentExportJob === EXPORT_JOB_STATE.BOTH
+        ? "Exporting Both..."
+        : EXPORT_BUTTON_TEXT.BOTH;
+  }
+}
+
+function recomputeOrderedTimelineSegments() {
+  orderedTimelineSegments = buildOrderedTimelineSegments();
+  pruneEncodedSegmentCache(orderedTimelineSegments);
+  refreshExportButtonsUI();
+}
+
+function setCurrentExportJob(jobState) {
+  currentExportJob = jobState;
+  refreshExportButtonsUI();
+}
+
+function calculateNonSilentRanges(segments = null) {
+  console.warn("inside calculateNonSilentRanges");
+  title.innerText = "Getting ready...";
+
+  const sourceSegments = segments || buildOrderedTimelineSegments();
+  return sourceSegments
+    .filter((segment) => segment.type === "noisy")
+    .map(({ start, end }) => ({ start, end }));
 }
 
 ///////////////////////
@@ -616,6 +760,7 @@ function markSilentRegions() {
 
   drawRegions();
   updateStats();
+  recomputeOrderedTimelineSegments();
 }
 
 function drawRegions() {
@@ -838,47 +983,71 @@ async function triggerFileLoad() {
   }
 }
 
-function showLargeFileWarning() {
-  if (document.getElementById("large-file-warning")) return; // prevent duplicates
-
-  const warning = document.createElement("div");
-  warning.id = "large-file-warning";
-  warning.style.cssText = `
-    background: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeeba;
-    padding: 32px;
-    font-size: 18px;
-    border-radius: 6px;
-    margin-top: 20px;
-    text-align: center;
-  `;
-
-  warning.innerHTML = `
-    ⚠️ This file is large and will not process well in your browser.<br>
-    <a href="https://mega.nz/folder/PBtzhZqa#EcOfYukj90PzeAYlBa4LbA" target="_blank" style="color:#004085; text-decoration:underline;">
-      Click here to download the desktop version of Silence Cutter
-    </a>.
-  `;
-
-  const title = document.getElementById("title");
-  if (title && title.parentNode) {
-    title.parentNode.insertBefore(warning, title.nextSibling);
+function removeLargeFileWarning() {
+  const warning = document.getElementById("large-file-warning");
+  if (warning) {
+    warning.remove();
   }
 }
 
-async function handleFile(fileOrPath) {
+function showLargeFileWarning() {
+  removeLargeFileWarning();
+
+  return new Promise((resolve) => {
+    const warning = document.createElement("div");
+    warning.id = "large-file-warning";
+    warning.className = "large-file-warning";
+    warning.innerHTML = `
+      <p>We noticed your video is larger than 700MB.</p>
+      <p>For files of this size, we recommend using the EXE version, as your browser tab may crash.</p>
+      <div class="large-file-warning-actions">
+        <button type="button" id="large-file-proceed-btn">Yes, I would like to proceed</button>
+        <button type="button" id="large-file-exe-btn">Download EXE instead</button>
+      </div>
+    `;
+
+    if (dropZone && dropZone.parentNode) {
+      dropZone.parentNode.insertBefore(warning, dropZone.nextSibling);
+    }
+
+    const proceedBtn = document.getElementById("large-file-proceed-btn");
+    const exeBtn = document.getElementById("large-file-exe-btn");
+
+    proceedBtn?.addEventListener("click", () => {
+      removeLargeFileWarning();
+      resolve("proceed");
+    });
+
+    exeBtn?.addEventListener("click", () => {
+      window.open(EXE_DOWNLOAD_URL, "_blank", "noopener,noreferrer");
+      removeLargeFileWarning();
+      resolve("download_exe");
+    });
+  });
+}
+
+async function handleFile(fileOrPath, options = {}) {
   console.warn("inside handleFile");
 
   if (!fileOrPath) return;
+  const { skipLargeFileCheck = false } = options;
 
   const isElectron = !!window.ElectronAPI;
 
-  if (!isElectron && fileOrPath.size && fileOrPath.size >= 700 * 1024 * 1024) {
-    showLargeFileWarning();
+  if (
+    !isElectron &&
+    !skipLargeFileCheck &&
+    fileOrPath.size &&
+    fileOrPath.size > LARGE_FILE_LIMIT_BYTES
+  ) {
+    const decision = await showLargeFileWarning();
+    if (decision === "proceed") {
+      await handleFile(fileOrPath, { skipLargeFileCheck: true });
+    }
     return;
   }
 
+  removeLargeFileWarning();
   resetUIState();
 
   if (isElectron && fileOrPath.path) {
@@ -1352,78 +1521,254 @@ function encodeMP3(buffer) {
 // PROCESSING VIDEO
 ////////////////////////////
 
-async function cutVideo() {
-  console.warn("inside cutVideo");
+function buildSegmentEncodingArgs(segment, inputName = "input.mp4") {
+  const start = segment.start.toFixed(6);
+  const duration = (segment.end - segment.start).toFixed(6);
 
-  console.log("🧠 cutVideo() called");
+  return [
+    "-ss",
+    start,
+    "-i",
+    inputName,
+    "-to",
+    duration,
+    "-c:v",
+    "libx264",
+    "-crf",
+    "20",
+    "-preset",
+    "ultrafast",
+    "-profile:v",
+    "high",
+    "-pix_fmt",
+    "yuv420p",
+    "-movflags",
+    "+faststart",
+    "-c:a",
+    "aac",
+    "-b:a",
+    "128k",
+    "-threads",
+    "0",
+    "-avoid_negative_ts",
+    "1",
+    segment.outputName,
+  ];
+}
 
-  const uploadedFile = window.uploadedFile;
+function triggerBlobDownload(blob, outputName) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = outputName;
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
-  if (!uploadedFile) {
-    console.warn("❌ No uploaded file — exiting early.");
+function buildScopedFileName(scope, baseName) {
+  return `${scope}_${baseName}`;
+}
+
+async function runExportAction(jobState, action) {
+  if (isExportRunning()) {
     return;
   }
 
-  const nonSilentRegions = calculateNonSilentRanges();
-  if (!nonSilentRegions?.length) {
-    alert("No silence detected — full video kept!");
+  const uploadedFile = window.uploadedFile;
+  if (!uploadedFile) {
+    alert("Please upload a video first.");
     return;
+  }
+
+  recomputeOrderedTimelineSegments();
+  if (!orderedTimelineSegments.length) {
+    alert("No segments found. Adjust silence detection first.");
+    return;
+  }
+
+  setCurrentExportJob(jobState);
+  try {
+    await action(uploadedFile, orderedTimelineSegments);
+  } catch (err) {
+    console.error("❌ Export failed:", err);
+    alert(`Export failed: ${err.message}`);
+    title.innerText = "Export failed.";
+  } finally {
+    setCurrentExportJob(EXPORT_JOB_STATE.IDLE);
+  }
+}
+
+async function buildSegmentsZipInBrowser(uploadedFile, segments, scope = "zip") {
+  const { createFFmpeg } = window.FFmpegLib;
+  const ffmpegZip = createFFmpeg({ log: true });
+  const zip = new JSZip();
+  const inputName = buildScopedFileName(scope, "input.mp4");
+  let ffmpegReady = false;
+
+  try {
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const internalOutputName = buildScopedFileName(scope, segment.outputName);
+      const scopedSegment = { ...segment, outputName: internalOutputName };
+      updateSegmentUI(segment, i, segments.length);
+      title.innerText = `Preparing ZIP segment ${i + 1}/${segments.length}...`;
+
+      let data = getCachedSegmentBuffer(segment);
+      if (!data) {
+        if (!ffmpegReady) {
+          await ffmpegZip.load({
+            classWorkerURL: new URL("/worker/worker.mjs", window.location.origin).href,
+            workerOptions: { type: "module" },
+          });
+          await ffmpegZip.writeFile(inputName, await fetchFile(uploadedFile));
+          ffmpegReady = true;
+        }
+
+        await ffmpegZip.exec(buildSegmentEncodingArgs(scopedSegment, inputName));
+        data = await ffmpegZip.readFile(internalOutputName);
+        setCachedSegmentBuffer(segment, data);
+
+        if (typeof ffmpegZip.deleteFile === "function") {
+          await ffmpegZip.deleteFile(internalOutputName);
+        }
+      }
+
+      zip.file(segment.outputName, data);
+    }
+  } finally {
+    if (ffmpegReady && typeof ffmpegZip.terminate === "function") {
+      ffmpegZip.terminate();
+    }
+  }
+
+  title.innerText = "Building ZIP archive...";
+  return zip.generateAsync({ type: "blob", compression: "STORE" });
+}
+
+async function buildSegmentsZipInElectron(inputPath, segments, scope = "zip") {
+  if (
+    typeof window.ElectronAPI?.readTempSegmentBuffer !== "function" ||
+    typeof window.ElectronAPI?.deleteTempSegment !== "function"
+  ) {
+    throw new Error("EXE segment ZIP support is not available in this build.");
+  }
+
+  const zip = new JSZip();
+  const createdFiles = [];
+
+  try {
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      const internalOutputName = buildScopedFileName(scope, segment.outputName);
+      updateSegmentUI(segment, i, segments.length);
+      title.innerText = `Preparing ZIP segment ${i + 1}/${segments.length}...`;
+      let buffer = getCachedSegmentBuffer(segment);
+      if (!buffer) {
+        await window.ElectronAPI.cutOneSegment(
+          { path: inputPath },
+          {
+            start: segment.start,
+            end: segment.end,
+            outputName: internalOutputName,
+          }
+        );
+
+        createdFiles.push(internalOutputName);
+        const rawBuffer = await window.ElectronAPI.readTempSegmentBuffer(
+          internalOutputName
+        );
+        buffer = new Uint8Array(rawBuffer);
+        setCachedSegmentBuffer(segment, buffer);
+        await window.ElectronAPI.deleteTempSegment(internalOutputName);
+      }
+
+      zip.file(segment.outputName, buffer);
+    }
+  } finally {
+    for (const fileName of createdFiles) {
+      await window.ElectronAPI.deleteTempSegment(fileName).catch(() => {});
+    }
+  }
+
+  title.innerText = "Building ZIP archive...";
+  return zip.generateAsync({ type: "blob", compression: "STORE" });
+}
+
+async function exportSegmentsZip(uploadedFile, segments, scope = "zip") {
+  const isElectron = !!window.ElectronAPI && !!uploadedFile.path;
+  const zipBlob = isElectron
+    ? await buildSegmentsZipInElectron(uploadedFile.path, segments, scope)
+    : await buildSegmentsZipInBrowser(uploadedFile, segments, scope);
+
+  triggerBlobDownload(zipBlob, ZIP_FILE_NAME);
+}
+
+async function downloadAllSegmentsZip() {
+  await runExportAction(EXPORT_JOB_STATE.ZIP, async (uploadedFile, segments) => {
+    await exportSegmentsZip(uploadedFile, segments, "zip");
+    title.innerText = "ZIP is ready. All segments were exported in timeline order.";
+  });
+}
+
+async function exportMergedMp4(uploadedFile, orderedSegments, scope = "mp4") {
+  const nonSilentSegments = orderedSegments.filter(
+    (segment) => segment.type === "noisy"
+  );
+  if (!nonSilentSegments.length) {
+    title.innerText = "No non-silent regions were found for MP4 export.";
+    return false;
   }
 
   const isElectron = typeof window.ElectronAPI?.cutOneSegment === "function";
-  const totalParts = nonSilentRegions.length;
-
+  const totalParts = nonSilentSegments.length;
   const allSegmentFileNames = [];
 
   if (isElectron) {
-    console.log("⚡ Detected Electron — using native FFmpeg");
-    console.log(`window.uploadedFile.path: ${window.uploadedFile.path}`);
-
-    const inputPath = window.uploadedFile.path; // set earlier in handleFile()
+    const inputPath = uploadedFile.path;
     if (!inputPath) {
-      console.warn("❌ No input path set on uploadedFile");
-      return;
+      throw new Error("Missing input path for EXE export.");
     }
 
     for (let i = 0; i < totalParts; i++) {
-      const region = nonSilentRegions[i];
-      const outputName = `part${i}.mp4`;
+      const segment = nonSilentSegments[i];
+      const outputName = buildScopedFileName(scope, `part_${i}.mp4`);
 
       allSegmentFileNames.push(outputName);
-      updateSegmentUI(region, i, totalParts);
+      updateSegmentUI(segment, i, totalParts);
+
+      const cachedBuffer = getCachedSegmentBuffer(segment);
+      if (
+        cachedBuffer &&
+        typeof window.ElectronAPI?.writeTempSegmentBuffer === "function"
+      ) {
+        await window.ElectronAPI.writeTempSegmentBuffer(outputName, cachedBuffer);
+        continue;
+      }
 
       await window.ElectronAPI.cutOneSegment(
-        { path: inputPath }, // ✅ Only pass file path
-        { start: region.start, end: region.end, outputName }
+        { path: inputPath },
+        { start: segment.start, end: segment.end, outputName }
       );
+
+      const rawBuffer = await window.ElectronAPI.readTempSegmentBuffer(outputName);
+      setCachedSegmentBuffer(segment, new Uint8Array(rawBuffer));
     }
 
-    const finalPath = await window.ElectronAPI.runMergeAndClean(
-      allSegmentFileNames
-    );
-    console.log(
-      "✅ Native Electron processing complete. Final path:",
-      finalPath
-    );
-
+    const finalPath = await window.ElectronAPI.runMergeAndClean(allSegmentFileNames);
     if (finalPath) {
       displayMergedVideoFromPath(finalPath);
     }
   } else {
-    console.log("🌐 Detected Web — using ffmpeg.wasm");
-
     const BATCH_SIZE = 30;
     let ffmpegLoaded = false;
-    let fullOutputBuffers = [];
+    const fullOutputBuffers = [];
+    const inputName = buildScopedFileName(scope, "input.mp4");
 
     async function initFFmpeg() {
-      console.warn("inside initFFmpeg");
-
       const { createFFmpeg } = window.FFmpegLib;
       ffmpeg = createFFmpeg({ log: true });
       await ffmpeg.load({
-        classWorkerURL: new URL("/worker/worker.mjs", window.location.origin)
-          .href,
+        classWorkerURL: new URL("/worker/worker.mjs", window.location.origin).href,
         workerOptions: { type: "module" },
       });
       ffmpegLoaded = true;
@@ -1433,68 +1778,39 @@ async function cutVideo() {
       await initFFmpeg();
     }
 
-    for (
-      let batchStart = 0;
-      batchStart < totalParts;
-      batchStart += BATCH_SIZE
-    ) {
-      const batch = nonSilentRegions.slice(batchStart, batchStart + BATCH_SIZE);
+    for (let batchStart = 0; batchStart < totalParts; batchStart += BATCH_SIZE) {
+      const batch = nonSilentSegments.slice(batchStart, batchStart + BATCH_SIZE);
       const segmentFileNames = [];
 
-      await ffmpeg.writeFile("input.mp4", await fetchFile(uploadedFile));
+      await ffmpeg.writeFile(inputName, await fetchFile(uploadedFile));
 
       for (let i = 0; i < batch.length; i++) {
         const index = batchStart + i;
-        const region = batch[i];
-        const outputName = `part${index}.mp4`;
-        const start = region.start.toFixed(6);
-        const duration = (region.end - region.start).toFixed(6);
+        const sourceSegment = batch[i];
+        const outputName = buildScopedFileName(scope, `part_${index}.mp4`);
+        const segment = { ...sourceSegment, outputName };
 
         allSegmentFileNames.push(outputName);
         segmentFileNames.push(outputName);
+        updateSegmentUI(sourceSegment, index, totalParts);
 
-        updateSegmentUI(region, index, totalParts);
+        const cachedBuffer = getCachedSegmentBuffer(sourceSegment);
+        if (cachedBuffer) {
+          await ffmpeg.writeFile(outputName, cachedBuffer);
+          continue;
+        }
 
-        const args = [
-          "-ss",
-          start,
-          "-i",
-          "input.mp4",
-          "-to",
-          duration,
-          "-c:v",
-          "libx264",
-          "-crf",
-          "20",
-          "-preset",
-          "ultrafast",
-          "-profile:v",
-          "high",
-          "-pix_fmt",
-          "yuv420p",
-          "-movflags",
-          "+faststart",
-          "-c:a",
-          "aac",
-          "-b:a",
-          "128k",
-          "-threads",
-          "0",
-          "-avoid_negative_ts",
-          "1",
-          outputName,
-        ];
-
-        await ffmpeg.exec(args);
+        await ffmpeg.exec(buildSegmentEncodingArgs(segment, inputName));
+        const outputBuffer = await ffmpeg.readFile(outputName);
+        setCachedSegmentBuffer(sourceSegment, outputBuffer);
       }
 
-      await concatSegments(
-        segmentFileNames,
+      const batchOutputName = buildScopedFileName(
+        scope,
         `final_batch_${batchStart / BATCH_SIZE}.mp4`
       );
-      const batchData = await ffmpeg.readFile(
-        `final_batch_${batchStart / BATCH_SIZE}.mp4`
-      );
+      await concatSegments(segmentFileNames, batchOutputName);
+      const batchData = await ffmpeg.readFile(batchOutputName);
       fullOutputBuffers.push(batchData);
 
       ffmpegLoaded = false;
@@ -1502,18 +1818,35 @@ async function cutVideo() {
       await initFFmpeg();
     }
 
-    window.processedBatches = fullOutputBuffers;
-
-    const finalBlob = await mergeProcessedBatchesWithFFmpegWASM();
+    const finalBlob = await mergeProcessedBatchesWithFFmpegWASM(fullOutputBuffers, scope);
     displayMergedVideo(finalBlob);
-    console.log("✅ WASM processing complete.");
   }
 
-  title.innerText =
-    "✅ Done! You can now concatenate the parts or download scripts.";
+  return true;
 }
 
-async function mergeProcessedBatchesWithFFmpegWASM() {
+async function cutVideo() {
+  await runExportAction(EXPORT_JOB_STATE.MP4, async (uploadedFile, segments) => {
+    const mp4Created = await exportMergedMp4(uploadedFile, segments, "mp4");
+    if (!mp4Created) {
+      alert("No non-silent regions detected. MP4 export was skipped.");
+      return;
+    }
+    title.innerText = "✅ MP4 is ready. You can also export the timeline ZIP.";
+  });
+}
+
+async function exportBoth() {
+  await runExportAction(EXPORT_JOB_STATE.BOTH, async (uploadedFile, segments) => {
+    const mp4Created = await exportMergedMp4(uploadedFile, segments, "both_mp4");
+    await exportSegmentsZip(uploadedFile, segments, "both_zip");
+    title.innerText = mp4Created
+      ? "✅ MP4 and ZIP are ready."
+      : "✅ ZIP is ready. MP4 was skipped (no non-silent regions).";
+  });
+}
+
+async function mergeProcessedBatchesWithFFmpegWASM(batchBuffers, scope = "mp4") {
   console.warn("inside mergeProcessedBatchesWithFFmpegWASM");
 
   const { createFFmpeg } = window.FFmpegLib;
@@ -1526,13 +1859,15 @@ async function mergeProcessedBatchesWithFFmpegWASM() {
 
   const listLines = [];
 
-  for (let i = 0; i < window.processedBatches.length; i++) {
-    const filename = `final_batch_${i}.mp4`;
-    await ffmpegMerge.writeFile(filename, window.processedBatches[i]);
+  for (let i = 0; i < batchBuffers.length; i++) {
+    const filename = buildScopedFileName(scope, `final_batch_${i}.mp4`);
+    await ffmpegMerge.writeFile(filename, batchBuffers[i]);
     listLines.push(`file '${filename}'`);
   }
 
-  await ffmpegMerge.writeFile("list.txt", listLines.join("\n"));
+  const listName = buildScopedFileName(scope, "list.txt");
+  const outputName = buildScopedFileName(scope, "final_merged.mp4");
+  await ffmpegMerge.writeFile(listName, listLines.join("\n"));
 
   const args = [
     "-f",
@@ -1540,15 +1875,15 @@ async function mergeProcessedBatchesWithFFmpegWASM() {
     "-safe",
     "0",
     "-i",
-    "list.txt",
+    listName,
     "-c",
     "copy",
-    "final_merged.mp4",
+    outputName,
   ];
 
   await ffmpegMerge.exec(args);
 
-  const finalData = await ffmpegMerge.readFile("final_merged.mp4");
+  const finalData = await ffmpegMerge.readFile(outputName);
   return new Blob([finalData.buffer], { type: "video/mp4" });
 }
 
@@ -1599,9 +1934,10 @@ function displayMergedVideoFromPath(filePath) {
 
 async function concatSegments(fileNames, outputFileName = "final.mp4") {
   console.warn("inside concatSegments");
+  const listFileName = buildScopedFileName(outputFileName, "list.txt");
 
   await ffmpeg.writeFile(
-    "list.txt",
+    listFileName,
     fileNames.map((name) => `file '${name}'`).join("\n")
   );
 
@@ -1611,7 +1947,7 @@ async function concatSegments(fileNames, outputFileName = "final.mp4") {
     "-safe",
     "0",
     "-i",
-    "list.txt",
+    listFileName,
     "-c",
     "copy",
     outputFileName,
