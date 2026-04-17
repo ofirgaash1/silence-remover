@@ -8,7 +8,10 @@ export default {
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        tones: resolve(__dirname, 'tones.html') 
+        mp3: resolve(__dirname, 'mp3-silence-remover.html'),
+        mp4: resolve(__dirname, 'mp4-silence-remover.html'),
+        audio: resolve(__dirname, 'remove-silence-from-audio.html'),
+        video: resolve(__dirname, 'remove-silence-from-video.html')
       }
     }
   },
