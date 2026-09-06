@@ -1,8 +1,15 @@
 import { FFmpeg } from "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.15/dist/esm/classes.js";
 import JSZip from "jszip";
+import { loadFFmpeg } from "./loadFFmpeg.js";
+import { errorMessage, guardFFmpeg } from "./guardFFmpeg.js";
 import "./style.css";
+const exportEngines = new Set();
 window.FFmpegLib = {
-  createFFmpeg: (options) => new FFmpeg(options),
+  createFFmpeg: (options) => {
+    const engine = guardFFmpeg(new FFmpeg(options));
+    exportEngines.add(engine);
+    return engine;
+  },
   fetchFile: async (file) => {
     const buffer = await file.arrayBuffer();
     return new Uint8Array(buffer);
@@ -1580,9 +1587,12 @@ async function runExportAction(jobState, action) {
     await action(uploadedFile, orderedTimelineSegments);
   } catch (err) {
     console.error("❌ Export failed:", err);
-    alert(`Export failed: ${err.message}`);
-    title.innerText = "Export failed.";
+    const message = `Export failed: ${errorMessage(err)}`;
+    title.innerText = message;
+    alert(message);
   } finally {
+    for (const engine of exportEngines) engine.terminate();
+    exportEngines.clear();
     setCurrentExportJob(EXPORT_JOB_STATE.IDLE);
   }
 }
@@ -1605,10 +1615,8 @@ async function buildSegmentsZipInBrowser(uploadedFile, segments, scope = "zip") 
       let data = getCachedSegmentBuffer(segment);
       if (!data) {
         if (!ffmpegReady) {
-          await ffmpegZip.load({
-            classWorkerURL: new URL("/worker/worker.mjs", window.location.origin).href,
-            workerOptions: { type: "module" },
-          });
+          title.innerText = "Loading export engine...";
+          await loadFFmpeg(ffmpegZip);
           await ffmpegZip.writeFile(inputName, await fetchFile(uploadedFile));
           ffmpegReady = true;
         }
@@ -1756,10 +1764,8 @@ async function exportMergedMp4(uploadedFile, orderedSegments, scope = "mp4") {
     async function initFFmpeg() {
       const { createFFmpeg } = window.FFmpegLib;
       ffmpeg = createFFmpeg({ log: true });
-      await ffmpeg.load({
-        classWorkerURL: new URL("/worker/worker.mjs", window.location.origin).href,
-        workerOptions: { type: "module" },
-      });
+      title.innerText = "Loading export engine...";
+      await loadFFmpeg(ffmpeg);
       ffmpegLoaded = true;
     }
 
@@ -1803,6 +1809,8 @@ async function exportMergedMp4(uploadedFile, orderedSegments, scope = "mp4") {
       fullOutputBuffers.push(batchData);
 
       ffmpegLoaded = false;
+      ffmpeg.terminate();
+      exportEngines.delete(ffmpeg);
       ffmpeg = null;
       await initFFmpeg();
     }
@@ -1831,10 +1839,8 @@ async function mergeProcessedBatchesWithFFmpegWASM(batchBuffers, scope = "mp4") 
   const { createFFmpeg } = window.FFmpegLib;
   const ffmpegMerge = createFFmpeg({ log: true });
 
-  await ffmpegMerge.load({
-    classWorkerURL: new URL("/worker/worker.mjs", window.location.origin).href,
-    workerOptions: { type: "module" },
-  });
+  title.innerText = "Loading export engine for final merge...";
+  await loadFFmpeg(ffmpegMerge);
 
   const listLines = [];
 
